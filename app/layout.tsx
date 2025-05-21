@@ -19,7 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full">
-      <body className={`${geist.className} antialiased h-full`}>
+      <body className={`${geist.className} antialiased h-full text-black bg-gray-100`}>
         {children}
       </body>
     </html>

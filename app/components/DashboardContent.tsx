@@ -35,21 +35,21 @@ export default function DashboardContent() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+      <h1 className="text-2xl font-bold mb-6 text-black">Dashboard</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center">
+          <h2 className="text-lg font-semibold mb-4 flex items-center text-black">
             <FiCalendar className="mr-2" /> Today's Events
           </h2>
           {loading ? (
-            <p>Loading...</p>
+            <p className="text-black">Loading...</p>
           ) : todayEvents.length > 0 ? (
             <div className="space-y-4">
               {todayEvents.map((event) => (
                 <div key={event.id} className="border-l-4 border-blue-500 pl-4 py-2">
-                  <h3 className="font-medium">{event.eventTitle}</h3>
-                  <div className="text-sm text-gray-600 mt-1 space-y-1">
+                  <h3 className="font-medium text-black">{event.eventTitle}</h3>
+                  <div className="text-sm text-black mt-1 space-y-1">
                     <p className="flex items-center">
                       <FiClock className="mr-2" size={14} />
                       {event.startTime} - {event.endTime}
@@ -63,47 +63,47 @@ export default function DashboardContent() {
               ))}
             </div>
           ) : (
-            <p className="text-gray-500">No events scheduled for today.</p>
+            <p className="text-black">No events scheduled for today.</p>
           )}
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">Quick Stats</h2>
+          <h2 className="text-lg font-semibold mb-4 text-black">Quick Stats</h2>
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-blue-50 p-4 rounded-lg">
-              <p className="text-sm text-blue-800">Today's Events</p>
-              <p className="text-2xl font-bold text-blue-600">{todayEvents.length}</p>
+              <p className="text-sm text-blue-900">Today's Events</p>
+              <p className="text-2xl font-bold text-blue-900">{todayEvents.length}</p>
             </div>
             <div className="bg-green-50 p-4 rounded-lg">
-              <p className="text-sm text-green-800">Upcoming Events</p>
-              <p className="text-2xl font-bold text-green-600">{upcomingEvents.length}</p>
+              <p className="text-sm text-green-900">Upcoming Events</p>
+              <p className="text-2xl font-bold text-green-900">{upcomingEvents.length}</p>
             </div>
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">Upcoming Events</h2>
+        <h2 className="text-lg font-semibold mb-4 text-black">Upcoming Events</h2>
         {loading ? (
-          <p>Loading...</p>
+          <p className="text-black">Loading...</p>
         ) : upcomingEvents.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                     Event
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                     Venue
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                     Time
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                     Status
                   </th>
                 </tr>
@@ -112,27 +112,27 @@ export default function DashboardContent() {
                 {upcomingEvents.slice(0, 5).map((event) => (
                   <tr key={event.id}>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{event.eventTitle}</div>
-                      <div className="text-sm text-gray-500">{event.department}</div>
+                      <div className="text-sm font-medium text-black">{event.eventTitle}</div>
+                      <div className="text-sm text-black">{event.department}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
                       {event.venueName}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
                       {formatDate(event.startDate)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
                       {event.startTime} - {event.endTime}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         event.status === 'Confirmed' 
-                          ? 'bg-green-100 text-green-800' 
+                          ? 'bg-green-100 text-green-900' 
                           : event.status === 'Cancelled' 
-                            ? 'bg-red-100 text-red-800'
+                            ? 'bg-red-100 text-red-900'
                             : event.status === 'Processing'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-blue-100 text-blue-800'
+                              ? 'bg-yellow-100 text-yellow-900'
+                              : 'bg-blue-100 text-blue-900'
                       }`}>
                         {event.status}
                       </span>
@@ -143,7 +143,7 @@ export default function DashboardContent() {
             </table>
           </div>
         ) : (
-          <p className="text-gray-500">No upcoming events scheduled.</p>
+          <p className="text-black">No upcoming events scheduled.</p>
         )}
       </div>
     </div>
