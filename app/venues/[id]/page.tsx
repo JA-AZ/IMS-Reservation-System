@@ -1,13 +1,14 @@
 import AdminLayout from '../../components/AdminLayout';
 import VenueDetails from '../../components/VenueDetails';
 
-type Props = {
+interface PageProps {
   params: {
-    id: string
-  }
+    id: string;
+  };
+  searchParams?: { [key: string]: string | string[] | undefined };
 }
 
-export default async function VenuePage({ params }: Props) {
+export default function VenuePage({ params }: PageProps) {
   return (
     <AdminLayout>
       <VenueDetails venueId={params.id} />
