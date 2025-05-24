@@ -71,7 +71,7 @@ export default function EditVenuePage() {
       
       await updateVenue(venueId, {
         name: formData.name,
-        capacity: formData.capacity ? parseInt(formData.capacity) : null,
+        capacity: formData.capacity ? parseInt(formData.capacity) : undefined,
         description: formData.description,
       });
       
