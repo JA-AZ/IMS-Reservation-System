@@ -2,18 +2,21 @@
 
 import { useState, useEffect } from 'react';
 import { FiCalendar, FiClock, FiMapPin, FiUsers, FiUser } from 'react-icons/fi';
-import { getVenues, getStaffMembers, addReservation } from '../firebase/services';
-import { VenueType, StaffMember, ReservationStatus } from '../types';
-import { useSearchParams } from 'next/navigation';
+import { getVenues, getStaffMembers, getReservation, updateReservation } from '../firebase/services';
+import { VenueType, StaffMember, ReservationStatus, Reservation } from '../types';
+import { useRouter } from 'next/navigation';
 import ReservationCalendar from './ReservationCalendar';
 
-export default function ReservationForm() {
-  const searchParams = useSearchParams();
-  const preSelectedVenueId = searchParams.get('venue');
+interface EditReservationFormProps {
+  reservationId: string;
+}
+
+export default function EditReservationForm({ reservationId }: EditReservationFormProps) {
+  const router = useRouter();
 
   // Form state
-  const [formData, setFormData] = useState({
-    venueId: preSelectedVenueId || '',
+  const [formData, setFormData] = useState<Partial<Reservation>>({
+    venueId: '',
     department: '',
     eventTitle: '',
     reservedBy: '',
@@ -32,27 +35,60 @@ export default function ReservationForm() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   
   // UI state
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saveLoading, setSaveLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [notFound, setNotFound] = useState(false);
 
-  // Fetch venues and staff on component mount
+  // Fetch reservation, venues, and staff on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const venuesData = await getVenues();
-        const staffData = await getStaffMembers();
+        // Fetch the reservation data
+        const reservationData = await getReservation(reservationId);
+        
+        if (!reservationData) {
+          setNotFound(true);
+          setError('Reservation not found');
+          setLoading(false);
+          return;
+        }
+        
+        // Fetch venues and staff
+        const [venuesData, staffData] = await Promise.all([
+          getVenues(),
+          getStaffMembers()
+        ]);
+        
+        // Set form data from reservation
+        setFormData({
+          venueId: reservationData.venueId,
+          department: reservationData.department,
+          eventTitle: reservationData.eventTitle,
+          reservedBy: reservationData.reservedBy,
+          email: reservationData.email,
+          startDate: reservationData.startDate,
+          endDate: reservationData.endDate,
+          startTime: reservationData.startTime,
+          endTime: reservationData.endTime,
+          status: reservationData.status,
+          receivedBy: reservationData.receivedBy,
+          notes: reservationData.notes || ''
+        });
         
         setVenues(venuesData);
         setStaff(staffData);
       } catch (error) {
         console.error('Error fetching data:', error);
-        setError('Failed to load form data. Please try again.');
+        setError('Failed to load reservation data. Please try again.');
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [reservationId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -81,7 +117,7 @@ export default function ReservationForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSaveLoading(true);
     setError('');
     setSuccess(false);
     
@@ -98,46 +134,68 @@ export default function ReservationForm() {
         venueName: selectedVenue.name
       };
       
-      // Add the reservation to Firestore
-      await addReservation(reservationData);
+      // Update the reservation in Firestore
+      await updateReservation(reservationId, reservationData);
       
-      // Show success message and reset form
+      // Show success message
       setSuccess(true);
-      setFormData({
-        venueId: preSelectedVenueId || '',
-        department: '',
-        eventTitle: '',
-        reservedBy: '',
-        email: '',
-        startDate: '',
-        endDate: '',
-        startTime: '',
-        endTime: '',
-        status: 'Reserved' as ReservationStatus,
-        receivedBy: '',
-        notes: ''
-      });
       
-      // Clear success message after 3 seconds
+      // Navigate back to reservations list after a short delay
       setTimeout(() => {
-        setSuccess(false);
-      }, 3000);
+        router.push('/reservations');
+      }, 1500);
       
     } catch (error: any) {
-      console.error('Error creating reservation:', error);
-      setError(error.message || 'Failed to create reservation');
+      console.error('Error updating reservation:', error);
+      setError(error.message || 'Failed to update reservation');
     } finally {
-      setLoading(false);
+      setSaveLoading(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="animate-pulse flex space-x-4">
+          <div className="flex-1 space-y-6 py-1">
+            <div className="h-6 bg-gray-200 rounded w-1/4"></div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="h-10 bg-gray-200 rounded"></div>
+                <div className="h-10 bg-gray-200 rounded"></div>
+              </div>
+              <div className="h-10 bg-gray-200 rounded"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <div className="bg-white rounded-lg shadow p-6">
+        <h1 className="text-2xl font-bold mb-6 text-gray-900">Edit Reservation</h1>
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          Reservation not found. It may have been deleted.
+        </div>
+        <button
+          onClick={() => router.push('/reservations')}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          Back to Reservations
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h1 className="text-2xl font-bold mb-6 text-gray-900">New Reservation</h1>
+      <h1 className="text-2xl font-bold mb-6 text-gray-900">Edit Reservation</h1>
       
       {success && (
         <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-          Reservation created successfully!
+          Reservation updated successfully! Redirecting...
         </div>
       )}
       
@@ -236,6 +294,25 @@ export default function ReservationForm() {
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 placeholder="Enter email address"
               />
+            </div>
+            
+            {/* Status */}
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-1">
+                Status
+              </label>
+              <select
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                required
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+              >
+                <option value="Processing">Processing</option>
+                <option value="Reserved">Reserved</option>
+                <option value="Confirmed">Confirmed</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
             </div>
             
             {/* Received By */}
@@ -339,15 +416,22 @@ export default function ReservationForm() {
             />
           </div>
           
-          <div className="flex justify-end pt-4">
+          <div className="flex justify-end pt-4 space-x-3">
+            <button
+              type="button"
+              onClick={() => router.push('/reservations')}
+              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Cancel
+            </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={saveLoading}
               className={`px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                loading ? 'opacity-70 cursor-not-allowed' : ''
+                saveLoading ? 'opacity-70 cursor-not-allowed' : ''
               }`}
             >
-              {loading ? 'Creating...' : 'Create Reservation'}
+              {saveLoading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>
@@ -355,7 +439,7 @@ export default function ReservationForm() {
         {/* Calendar */}
         <div className="mt-6 md:mt-0 md:w-64">
           <ReservationCalendar 
-            selectedDate={formData.startDate} 
+            selectedDate={formData.startDate?.toString() || ''} 
             onDateSelect={handleDateSelect} 
             venueId={formData.venueId}
           />

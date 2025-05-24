@@ -5,27 +5,35 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
   
   return (
-    <div className="flex h-screen bg-gray-100">
-      <div className={`${sidebarOpen ? 'block' : 'hidden'} lg:block`}>
-        <Sidebar />
-      </div>
+    <div className="min-h-screen bg-gray-100">
+      <Header toggleSidebar={toggleSidebar} />
       
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header toggleSidebar={toggleSidebar} />
-        
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">
-            {children}
-          </div>
+      <Sidebar isOpen={sidebarOpen} closeSidebar={() => setSidebarOpen(false)} />
+      
+      <div 
+        className={`transition-all duration-300 ease-in-out pt-4 md:pt-20 ${
+          sidebarOpen ? 'md:ml-64' : 'ml-0 md:ml-64'
+        }`}
+      >
+        <main className="container mx-auto px-4  max-w-7xl">
+          {children}
         </main>
       </div>
+
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm md:hidden z-30"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
     </div>
   );
 } 

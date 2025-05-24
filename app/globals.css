@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #000000;
+  --background: #f8fafc;
+  --foreground: #111827;
 }
 
 @theme inline {
@@ -23,27 +23,59 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  padding-top: 4rem; /* Add padding for fixed header */
 }
 
-/* Override Tailwind text colors */
+/* Main content layout */
+.main-content {
+  margin-left: 0;
+  padding: 1.5rem;
+  transition: margin-left 0.3s ease;
+}
+
+@media (min-width: 768px) {
+  .main-content {
+    margin-left: 16rem; /* 256px = w-64 */
+  }
+}
+
+/* Remove previous text color overrides */
 .text-gray-400,
 .text-gray-500,
 .text-gray-600,
-.text-gray-700 {
-  color: #000000 !important;
+.text-gray-700,
+.text-gray-800,
+.text-gray-900 {
+  color: #111827 !important;
 }
 
-/* Ensure all text elements have proper contrast */
-p, h1, h2, h3, h4, h5, h6, span, div, a, button, input, textarea, select, option, th, td {
-  color: inherit;
+input, textarea, select, option {
+  color: #111827 !important;
+  background: #fff;
 }
 
-/* Dark mode overrides */
-@media (prefers-color-scheme: dark) {
-  .text-gray-400,
-  .text-gray-500,
-  .text-gray-600,
-  .text-gray-700 {
-    color: #ffffff !important;
+label {
+  color: #111827 !important;
+}
+
+/* Sidebar and navbar text always white on dark backgrounds */
+.bg-gray-800, .bg-blue-600, .sidebar-dark {
+  color: #fff !important;
+}
+
+/* Show/hide sidebar */
+.sidebar {
+  transition: transform 0.3s ease;
+}
+
+.sidebar.open {
+  transform: translateX(0);
+}
+
+/* Responsive utility */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100vw !important;
+    max-width: 256px;
   }
 }

@@ -5,7 +5,6 @@ export type VenueType = {
   name: string;
   capacity?: number;
   description?: string;
-  imageUrl?: string;
 };
 
 export type StaffMember = {
@@ -31,6 +30,7 @@ export type Reservation = {
   endTime: string;
   status: ReservationStatus;
   receivedBy: string;
+  notes?: string; // Optional notes/details field
   createdAt: any; // Firestore Timestamp
   updatedAt: any; // Firestore Timestamp
 }; 

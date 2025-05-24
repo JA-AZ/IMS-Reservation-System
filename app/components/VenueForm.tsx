@@ -9,8 +9,7 @@ export default function VenueForm() {
   const [formData, setFormData] = useState({
     name: '',
     capacity: '',
-    description: '',
-    imageUrl: ''
+    description: ''
   });
   
   // UI state
@@ -38,8 +37,7 @@ export default function VenueForm() {
       const venueData = {
         name: formData.name,
         ...(formData.capacity ? { capacity: parseInt(formData.capacity) } : {}),
-        ...(formData.description ? { description: formData.description } : {}),
-        ...(formData.imageUrl ? { imageUrl: formData.imageUrl } : {})
+        ...(formData.description ? { description: formData.description } : {})
       };
       
       // Add the venue to Firestore
@@ -50,8 +48,7 @@ export default function VenueForm() {
       setFormData({
         name: '',
         capacity: '',
-        description: '',
-        imageUrl: ''
+        description: ''
       });
       
       // Clear success message after 3 seconds
@@ -69,7 +66,7 @@ export default function VenueForm() {
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-bold mb-4">Add New Venue</h2>
+      <h2 className="text-xl font-bold text-gray-900 mb-4">Add New Venue</h2>
       
       {success && (
         <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
@@ -86,7 +83,7 @@ export default function VenueForm() {
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Venue Name */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-900 mb-1">
             <FiMapPin className="inline mr-2" />
             Venue Name
           </label>
@@ -96,13 +93,14 @@ export default function VenueForm() {
             value={formData.name}
             onChange={handleChange}
             required
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+            placeholder="Enter venue name"
           />
         </div>
         
         {/* Capacity */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-900 mb-1">
             <FiUsers className="inline mr-2" />
             Capacity
           </label>
@@ -111,13 +109,14 @@ export default function VenueForm() {
             name="capacity"
             value={formData.capacity}
             onChange={handleChange}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+            placeholder="Enter venue capacity"
           />
         </div>
         
         {/* Description */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-900 mb-1">
             <FiInfo className="inline mr-2" />
             Description
           </label>
@@ -126,21 +125,8 @@ export default function VenueForm() {
             value={formData.description}
             onChange={handleChange}
             rows={3}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
-        
-        {/* Image URL */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Image URL
-          </label>
-          <input
-            type="url"
-            name="imageUrl"
-            value={formData.imageUrl}
-            onChange={handleChange}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+            placeholder="Enter venue description"
           />
         </div>
         

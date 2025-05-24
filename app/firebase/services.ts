@@ -45,6 +45,14 @@ export const addVenue = async (venue: Omit<VenueType, 'id'>): Promise<string> =>
   return docRef.id;
 };
 
+export const updateVenue = async (id: string, data: Partial<VenueType>): Promise<void> => {
+  const venueDoc = doc(db, 'venues', id);
+  await updateDoc(venueDoc, {
+    ...data,
+    updatedAt: serverTimestamp()
+  });
+};
+
 // Staff
 export const getStaffMembers = async (): Promise<StaffMember[]> => {
   const staffCollection = collection(db, 'staff');
@@ -171,4 +179,24 @@ export const updateReservation = async (id: string, data: Partial<Reservation>):
 export const deleteReservation = async (id: string): Promise<void> => {
   const reservationDoc = doc(db, 'reservations', id);
   await deleteDoc(reservationDoc);
+};
+
+export const getReservation = async (id: string): Promise<Reservation | null> => {
+  try {
+    const reservationDoc = doc(db, 'reservations', id);
+    const reservationSnap = await getDoc(reservationDoc);
+    
+    if (reservationSnap.exists()) {
+      const reservationData = reservationSnap.data() as Omit<Reservation, 'id'>;
+      return {
+        id: reservationSnap.id,
+        ...reservationData
+      };
+    } else {
+      return null;
+    }
+  } catch (error) {
+    console.error('Error fetching reservation:', error);
+    throw error;
+  }
 }; 
