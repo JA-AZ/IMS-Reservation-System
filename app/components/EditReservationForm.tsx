@@ -13,6 +13,9 @@ interface EditReservationFormProps {
 
 export default function EditReservationForm({ reservationId }: EditReservationFormProps) {
   const router = useRouter();
+  
+  // Ensure reservationId is a string
+  const reservationIdString = String(reservationId);
 
   // Form state
   const [formData, setFormData] = useState<Partial<Reservation>>({
@@ -46,7 +49,7 @@ export default function EditReservationForm({ reservationId }: EditReservationFo
     const fetchData = async () => {
       try {
         // Fetch the reservation data
-        const reservationData = await getReservation(reservationId);
+        const reservationData = await getReservation(reservationIdString);
         
         if (!reservationData) {
           setNotFound(true);
@@ -88,7 +91,7 @@ export default function EditReservationForm({ reservationId }: EditReservationFo
     };
 
     fetchData();
-  }, [reservationId]);
+  }, [reservationIdString]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -135,7 +138,7 @@ export default function EditReservationForm({ reservationId }: EditReservationFo
       };
       
       // Update the reservation in Firestore
-      await updateReservation(reservationId, reservationData);
+      await updateReservation(reservationIdString, reservationData);
       
       // Show success message
       setSuccess(true);
