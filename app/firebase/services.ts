@@ -12,8 +12,46 @@ import {
   Timestamp, 
   serverTimestamp
 } from 'firebase/firestore';
-import { db } from './config';
+import { 
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  User
+} from 'firebase/auth';
+import { db, auth } from './config';
 import { Reservation, VenueType, StaffMember } from '../types';
+
+// Authentication services
+export const signIn = async (email: string, password: string) => {
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    return userCredential.user;
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+};
+
+export const signOut = async () => {
+  try {
+    await firebaseSignOut(auth);
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+};
+
+export const createUser = async (email: string, password: string) => {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    return userCredential.user;
+  } catch (error: any) {
+    throw new Error(error.message);
+  }
+};
+
+export const getCurrentUser = (): User | null => {
+  return auth.currentUser;
+};
 
 // Venues
 export const getVenues = async (): Promise<VenueType[]> => {

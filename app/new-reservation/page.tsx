@@ -1,13 +1,18 @@
+'use client';
+
 import AdminLayout from '../components/AdminLayout';
-import ReservationForm from '../components/ReservationForm';
-import { Suspense } from 'react';
+import NewReservationForm from '../components/NewReservationForm';
+import { ProtectedRoute } from '../context/AuthContext';
 
 export default function NewReservationPage() {
   return (
-    <AdminLayout>
-      <Suspense fallback={<div className="text-center py-8">Loading reservation form...</div>}>
-        <ReservationForm />
-      </Suspense>
-    </AdminLayout>
+    <ProtectedRoute>
+      <AdminLayout>
+        <div className="space-y-6">
+          <h1 className="text-2xl font-bold text-gray-900">New Reservation</h1>
+          <NewReservationForm />
+        </div>
+      </AdminLayout>
+    </ProtectedRoute>
   );
 } 
