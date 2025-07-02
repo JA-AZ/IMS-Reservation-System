@@ -84,10 +84,14 @@ export default function VenueCalendar() {
     return dates;
   };
   
-  const getReservationsForDate = (date: string) => {
-    return reservations.filter(res => 
-      date >= res.startDate && date <= res.endDate
-    );
+  const getReservationsForDate = (dateStr: string | null) => {
+    if (!dateStr) return [];
+    return reservations.filter(res => {
+      // Exclude cancelled
+      if (res.status === 'Cancelled') return false;
+      // Check if the date is within the reservation period
+      return dateStr >= res.startDate && dateStr <= res.endDate;
+    });
   };
   
   const currentMonth = new Date().getMonth();
@@ -107,6 +111,16 @@ export default function VenueCalendar() {
   };
   
   const monthDates = getMonthDates(currentMonth, currentYear);
+
+  const formatTime = (timeString: string): string => {
+    if (!timeString) return '';
+    const [hours, minutes] = timeString.split(':');
+    const date = new Date();
+    date.setHours(Number(hours));
+    date.setMinutes(Number(minutes));
+    date.setSeconds(0);
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
 
   if (loading) {
     return <div className="text-center py-8 text-gray-900">Loading calendar...</div>;
@@ -191,8 +205,8 @@ export default function VenueCalendar() {
 
       {/* Modal for date details */}
       {showModal && selectedDate && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => { setShowModal(false); setSelectedDate(null); }}>
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-4 md:p-6">
               <h3 className="text-xl font-bold mb-4 text-gray-900">
                 Reservations for {formatDate(selectedDate)}
@@ -212,7 +226,7 @@ export default function VenueCalendar() {
                     <div className="text-gray-700 mt-2 space-y-1 text-sm md:text-base">
                       <p className="flex items-center">
                         <FiClock className="mr-2" size={14} />
-                        {res.startTime} - {res.endTime}
+                        {formatTime(res.startTime)} - {formatTime(res.endTime)}
                       </p>
                       <p className="flex items-center">
                         <FiUser className="mr-2" size={14} />
@@ -220,7 +234,11 @@ export default function VenueCalendar() {
                       </p>
                       <p className="flex items-center">
                         <FiMail className="mr-2" size={14} />
-                        {res.email}
+                        {res.contactNo}
+                      </p>
+                      <p className="flex items-center">
+                        <span className="font-medium mr-2">Received by:</span>
+                        {res.receivedBy}
                       </p>
                     </div>
                   </div>

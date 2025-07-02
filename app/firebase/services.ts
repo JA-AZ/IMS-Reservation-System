@@ -171,23 +171,22 @@ export const addReservation = async (reservation: Omit<Reservation, 'id' | 'crea
   const existingReservations = await getReservationsByVenue(reservation.venueId);
   
   const hasConflict = existingReservations.some(existing => {
+    // Ignore cancelled reservations
+    if (existing.status === 'Cancelled') return false;
     // Check for date overlap
     const existingStartDate = existing.startDate;
     const existingEndDate = existing.endDate;
     const newStartDate = reservation.startDate;
     const newEndDate = reservation.endDate;
-    
     // If dates don't overlap, there's no conflict
     if (newEndDate < existingStartDate || newStartDate > existingEndDate) {
       return false;
     }
-    
     // If dates overlap, check time overlap
     const existingStartTime = existing.startTime;
     const existingEndTime = existing.endTime;
     const newStartTime = reservation.startTime;
     const newEndTime = reservation.endTime;
-    
     // Check if times overlap
     return !(newEndTime <= existingStartTime || newStartTime >= existingEndTime);
   });
@@ -207,6 +206,38 @@ export const addReservation = async (reservation: Omit<Reservation, 'id' | 'crea
 };
 
 export const updateReservation = async (id: string, data: Partial<Reservation>): Promise<void> => {
+  // Only check for conflicts if all required fields are present
+  const requiredFields = [
+    'venueId', 'startDate', 'endDate', 'startTime', 'endTime'
+  ];
+  const hasAllFields = requiredFields.every(field => (data as any)[field]);
+
+  if (hasAllFields) {
+    const venueId = (data as any).venueId;
+    const startDate = (data as any).startDate;
+    const endDate = (data as any).endDate;
+    const startTime = (data as any).startTime;
+    const endTime = (data as any).endTime;
+
+    // Fetch all reservations for this venue
+    const existingReservations = await getReservationsByVenue(venueId);
+
+    const hasConflict = existingReservations.some(existing => {
+      // Ignore cancelled reservations and the reservation being edited
+      if (existing.status === 'Cancelled' || existing.id === id) return false;
+      // Check for date overlap
+      if (endDate < existing.startDate || startDate > existing.endDate) {
+        return false;
+      }
+      // If dates overlap, check time overlap
+      return !(endTime <= existing.startTime || startTime >= existing.endTime);
+    });
+
+    if (hasConflict) {
+      throw new Error('Time conflict: Another event is already scheduled for this venue during the selected time');
+    }
+  }
+
   const reservationDoc = doc(db, 'reservations', id);
   await updateDoc(reservationDoc, {
     ...data,

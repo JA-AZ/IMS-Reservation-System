@@ -23,7 +23,7 @@ export default function EditReservationForm({ reservationId }: EditReservationFo
     department: '',
     eventTitle: '',
     reservedBy: '',
-    email: '',
+    contactNo: '',
     startDate: '',
     endDate: '',
     startTime: '',
@@ -70,7 +70,7 @@ export default function EditReservationForm({ reservationId }: EditReservationFo
           department: reservationData.department,
           eventTitle: reservationData.eventTitle,
           reservedBy: reservationData.reservedBy,
-          email: reservationData.email,
+          contactNo: reservationData.contactNo,
           startDate: reservationData.startDate,
           endDate: reservationData.endDate,
           startTime: reservationData.startTime,
@@ -154,6 +154,16 @@ export default function EditReservationForm({ reservationId }: EditReservationFo
     } finally {
       setSaveLoading(false);
     }
+  };
+
+  const formatTime = (timeString: string): string => {
+    if (!timeString) return '';
+    const [hours, minutes] = timeString.split(':');
+    const date = new Date();
+    date.setHours(Number(hours));
+    date.setMinutes(Number(minutes));
+    date.setSeconds(0);
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
   if (loading) {
@@ -283,19 +293,19 @@ export default function EditReservationForm({ reservationId }: EditReservationFo
               />
             </div>
             
-            {/* Email Address */}
+            {/* Contact No */}
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-1">
-                Email Address
+                Contact No
               </label>
               <input
-                type="email"
-                name="email"
-                value={formData.email}
+                type="text"
+                name="contactNo"
+                value={formData.contactNo}
                 onChange={handleChange}
                 required
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-                placeholder="Enter email address"
+                placeholder="Enter contact number"
               />
             </div>
             
@@ -323,20 +333,15 @@ export default function EditReservationForm({ reservationId }: EditReservationFo
               <label className="block text-sm font-medium text-gray-900 mb-1">
                 Received By
               </label>
-              <select
+              <input
+                type="text"
                 name="receivedBy"
                 value={formData.receivedBy}
                 onChange={handleChange}
                 required
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-              >
-                <option value="">Select staff member</option>
-                {staff.map((member) => (
-                  <option key={member.id} value={member.id} className="text-gray-900">
-                    {member.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="Enter name of receiver"
+              />
             </div>
             
             {/* Start Date */}

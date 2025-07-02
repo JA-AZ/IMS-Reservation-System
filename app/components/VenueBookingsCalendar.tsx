@@ -5,6 +5,7 @@ import { FiCalendar, FiChevronLeft, FiChevronRight, FiClock, FiUser, FiMail } fr
 import { getVenues, getReservations } from '../firebase/services';
 import { VenueType, Reservation } from '../types';
 import { format, addMonths, subMonths } from 'date-fns';
+import Link from 'next/link';
 
 // CSS for hiding scrollbars
 const hideScrollbarStyles = {
@@ -202,12 +203,22 @@ export default function VenueBookingsCalendar() {
   const getReservationsForDate = (dateStr: string | null) => {
     if (!dateStr) return [];
     return allReservations.filter(res => 
-      dateStr >= res.startDate && dateStr <= res.endDate
+      dateStr >= res.startDate && dateStr <= res.endDate && res.status !== 'Cancelled'
     );
   };
 
   const formatDate = (dateString: string) => {
     return format(new Date(dateString), 'MMM d, yyyy');
+  };
+
+  const formatTime = (timeString: string): string => {
+    if (!timeString) return '';
+    const [hours, minutes] = timeString.split(':');
+    const date = new Date();
+    date.setHours(Number(hours));
+    date.setMinutes(Number(minutes));
+    date.setSeconds(0);
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
   // Generate unique colors for each venue
@@ -314,13 +325,13 @@ export default function VenueBookingsCalendar() {
       {/* Add global styles */}
       <style jsx global>{globalStyles}</style>
       
-      <div className="flex items-center justify-between mb-6">
+      {/* Heading and Month Selection */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
         <h2 className="text-2xl font-semibold text-gray-900 flex items-center">
           <FiCalendar className="mr-2" />
           Venue Bookings Calendar
         </h2>
-        
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-4 mt-2 md:mt-0">
           <button
             onClick={() => navigateMonth('prev')}
             className="p-2 rounded-full hover:bg-blue-100 focus:outline-none text-blue-600"
@@ -328,9 +339,7 @@ export default function VenueBookingsCalendar() {
           >
             <FiChevronLeft size={20} />
           </button>
-          
           <span className="text-lg font-medium text-gray-900">{currentMonthName}</span>
-          
           <button
             onClick={() => navigateMonth('next')}
             className="p-2 rounded-full hover:bg-blue-100 focus:outline-none text-blue-600"
@@ -468,7 +477,7 @@ export default function VenueBookingsCalendar() {
                   <div className="text-xs text-gray-600 mt-0.5 space-y-0.5">
                     <div className="flex items-center">
                       <FiClock className="mr-1 flex-shrink-0" size={10} />
-                      <span className="truncate">{res.startTime} - {res.endTime}</span>
+                      <span className="truncate">{formatTime(res.startTime)} - {formatTime(res.endTime)}</span>
                     </div>
                     <div className="flex items-center">
                       <FiUser className="mr-1 flex-shrink-0" size={10} />
@@ -486,8 +495,8 @@ export default function VenueBookingsCalendar() {
 
       {/* Modal for date details */}
       {showModal && selectedDate && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => { setShowModal(false); setSelectedDate(null); }}>
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-4 md:p-6">
               <h3 className="text-2xl font-bold text-gray-900 mb-6">
                 Reservations for {formatDate(selectedDate)}
@@ -504,22 +513,20 @@ export default function VenueBookingsCalendar() {
                     <div className="text-gray-700 mt-2 space-y-1">
                       <p className="flex items-center text-gray-800">
                         <span className="font-medium mr-2">Time:</span>
-                        {res.startTime} - {res.endTime}
+                        {formatTime(res.startTime)} - {formatTime(res.endTime)}
                       </p>
                       <p className="flex items-center text-gray-800">
                         <span className="font-medium mr-2">Reserved by:</span>
                         {res.reservedBy}
                       </p>
                       <p className="flex items-center text-gray-800">
-                        <span className="font-medium mr-2">Department:</span>
-                        {res.department}
+                        <span className="font-medium mr-2">Received by:</span>
+                        {res.receivedBy}
                       </p>
-                      {res.email && (
-                        <p className="flex items-center text-gray-800">
-                          <span className="font-medium mr-2">Email:</span>
-                          {res.email}
-                        </p>
-                      )}
+                      <p className="flex items-center text-gray-800">
+                        <span className="font-medium mr-2">Contact No.:</span>
+                        {res.contactNo}
+                      </p>
                       {res.notes && (
                         <p className="flex items-start text-gray-800">
                           <span className="font-medium mr-2">Notes:</span>

@@ -30,7 +30,8 @@ export default function DebugPage() {
         appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
       };
       
-      initializeApp(firebaseConfig);
+      // Use a unique name for this Firebase instance
+      initializeApp(firebaseConfig, "DEBUG_APP");
       setFirebaseInitialized(true);
     } catch (error) {
       setFirebaseInitialized(error instanceof Error ? error.message : 'Unknown error');

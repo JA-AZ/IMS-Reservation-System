@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { format, addMonths, subMonths } from 'date-fns';
 import { getReservations, getVenues } from '../firebase/services';
@@ -21,6 +21,9 @@ export default function ReservationCalendar({ selectedDate, onDateSelect, venueI
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [venues, setVenues] = useState<VenueType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hoveredDate, setHoveredDate] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -123,8 +126,19 @@ export default function ReservationCalendar({ selectedDate, onDateSelect, venueI
     return dateStr === selectedDate;
   };
 
+  // Format time to 12-hour with AM/PM
+  const formatTime = (timeString: string): string => {
+    if (!timeString) return '';
+    const [hours, minutes] = timeString.split(':');
+    const date = new Date();
+    date.setHours(Number(hours));
+    date.setMinutes(Number(minutes));
+    date.setSeconds(0);
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+    <div ref={calendarRef} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-medium text-gray-900">Select Date</h3>
         <div className="flex items-center space-x-2">
@@ -172,36 +186,67 @@ export default function ReservationCalendar({ selectedDate, onDateSelect, venueI
           const venueReservations = getVenueReservationsForDate(cell.dateStr);
           const hasReservations = Object.keys(venueReservations).length > 0;
           const isSelected = isSelectedDate(cell.dateStr);
-          
+          const allReservationsForDate = getReservationsForDate(cell.dateStr);
+
           return (
-            <button
-              key={`day-${cell.day}`}
-              onClick={() => cell.dateStr && onDateSelect(cell.dateStr)}
-              className={`h-8 rounded flex items-center justify-center relative ${
-                isSelected 
-                  ? 'bg-blue-500 hover:bg-blue-600' 
-                  : 'bg-white hover:bg-gray-100'
-              }`}
-              aria-label={cell.dateStr || ''}
-              type="button"
-            >
-              <span className={`text-xs ${isSelected ? 'text-white' : 'text-gray-900'}`}>
-                {cell.day}
-              </span>
-              
-              {/* Show venue dots */}
-              {hasReservations && (
-                <div className="absolute bottom-0.5 flex justify-center gap-0.5">
-                  {Object.keys(venueReservations).map((vId, i) => (
-                    <span 
-                      key={`dot-${vId}-${i}`} 
-                      className="w-1 h-1 rounded-full" 
-                      style={{ backgroundColor: venueColors[vId] }}
-                    />
-                  ))}
+            <div key={`day-wrap-${cell.day}`} className="relative">
+              <button
+                key={`day-${cell.day}`}
+                onClick={() => cell.dateStr && onDateSelect(cell.dateStr)}
+                className={`h-8 rounded flex items-center justify-center relative w-full z-10 ${
+                  isSelected 
+                    ? 'bg-blue-500 hover:bg-blue-600' 
+                    : 'bg-white hover:bg-gray-100'
+                }`}
+                aria-label={cell.dateStr || ''}
+                type="button"
+                onMouseEnter={e => {
+                  setHoveredDate(cell.dateStr);
+                  const rect = (e.target as HTMLElement).getBoundingClientRect();
+                  if (calendarRef.current) {
+                    const parentRect = calendarRef.current.getBoundingClientRect();
+                    setTooltipPos({ x: rect.left - parentRect.left + rect.width / 2, y: rect.top - parentRect.top });
+                  }
+                }}
+                onMouseLeave={() => {
+                  setHoveredDate(null);
+                  setTooltipPos(null);
+                }}
+              >
+                <span className={`text-xs ${isSelected ? 'text-white' : 'text-gray-900'}`}>
+                  {cell.day}
+                </span>
+                {/* Show venue dots */}
+                {hasReservations && (
+                  <div className="absolute bottom-0.5 flex justify-center gap-0.5 left-0 right-0">
+                    {Object.keys(venueReservations).map((vId, i) => (
+                      <span 
+                        key={`dot-${vId}-${i}`} 
+                        className="w-1 h-1 rounded-full" 
+                        style={{ backgroundColor: venueColors[vId] }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </button>
+              {/* Tooltip for events on this date */}
+              {hoveredDate === cell.dateStr && allReservationsForDate.length > 0 && tooltipPos && (
+                <div
+                  className="absolute z-50 bg-white border border-gray-300 rounded shadow-lg p-2 text-xs min-w-[180px] max-w-xs left-1/2 -translate-x-1/2 -top-2 translate-y-[-100%] pointer-events-none"
+                  style={{ minWidth: '180px' }}
+                >
+                  <div className="font-semibold text-gray-800 mb-1">Events:</div>
+                  <ul className="space-y-1">
+                    {allReservationsForDate.map((res, idx) => (
+                      <li key={res.id || idx} className="flex flex-col">
+                        <span className="font-medium text-gray-900 truncate">{res.eventTitle}</span>
+                        <span className="text-gray-600">{formatTime(res.startTime)} - {formatTime(res.endTime)}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
-            </button>
+            </div>
           );
         })}
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { format, parse, startOfMonth, endOfMonth } from 'date-fns';
 import { FiEdit, FiTrash2, FiFilter, FiChevronLeft, FiChevronRight, FiEye, FiClock, FiMapPin, FiUser, FiMail, FiFileText, FiCalendar } from 'react-icons/fi';
 import Link from 'next/link';
@@ -23,6 +23,9 @@ export default function ReservationList() {
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [selectedVenue, setSelectedVenue] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -58,6 +61,14 @@ export default function ReservationList() {
     return acc;
   }, {} as { [key: string]: string });
 
+  // Debounce search term
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
   useEffect(() => {
     // Apply filters
     let filtered = [...allReservations];
@@ -91,10 +102,17 @@ export default function ReservationList() {
       filtered = filtered.filter(res => res.status === selectedStatus);
     }
     
+    // Filter by event title (case-insensitive, debounced)
+    if (debouncedSearchTerm.trim() !== '') {
+      filtered = filtered.filter(res =>
+        res.eventTitle.toLowerCase().includes(debouncedSearchTerm.trim().toLowerCase())
+      );
+    }
+    
     setReservations(filtered);
     setTotalPages(Math.ceil(filtered.length / rowsPerPage));
     setCurrentPage(1); // Reset to first page when filters change
-  }, [selectedMonth, selectedVenue, selectedStatus, allReservations]);
+  }, [selectedMonth, selectedVenue, selectedStatus, allReservations, debouncedSearchTerm]);
 
   const handleDelete = async () => {
     if (!reservationToDelete) return;
@@ -164,6 +182,16 @@ export default function ReservationList() {
     return Array.from(months).sort();
   };
 
+  const formatTime = (timeString: string): string => {
+    if (!timeString) return '';
+    const [hours, minutes] = timeString.split(':');
+    const date = new Date();
+    date.setHours(Number(hours));
+    date.setMinutes(Number(minutes));
+    date.setSeconds(0);
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+
   if (loading) {
     return <div className="text-center py-8 text-gray-900">Loading reservations...</div>;
   }
@@ -186,8 +214,33 @@ export default function ReservationList() {
 
   return (
     <div className="bg-white rounded-lg shadow">
-      {/* Filters */}
+      {/* Filters & Search */}
       <div className="p-4 border-b border-gray-200">
+        <div className="mb-4 relative">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Search by Event Title</label>
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Enter event title..."
+            className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 pr-10 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                searchInputRef.current?.focus();
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+              style={{ top: '50%' }}
+              aria-label="Clear search"
+            >
+              &#10005;
+            </button>
+          )}
+        </div>
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -248,62 +301,48 @@ export default function ReservationList() {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
+      <div className="w-full" style={{ minHeight: '540px' }}>
+        <table className="w-full table-fixed divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                Event
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                Venue
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                Date(s)
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                Time
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                Reserved By
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-700 uppercase tracking-wider text-center">
-                Actions
-              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-1/4">Event</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-1/4">Venue</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-1/5 hidden md:table-cell">Date(s)</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-1/5 hidden md:table-cell">Time</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-1/5 hidden md:table-cell">Reserved By</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-1/6 hidden md:table-cell">Status</th>
+              <th className="px-4 py-3 text-xs font-medium text-gray-700 uppercase tracking-wider text-center w-1/6">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {getCurrentPageReservations().map((reservation) => (
               <tr key={reservation.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{reservation.eventTitle}</div>
-                  <div className="text-sm text-gray-700">{reservation.department}</div>
+                <td className="px-4 py-4 align-top max-w-[180px]">
+                  <div className="text-sm font-medium text-gray-900 truncate" title={reservation.eventTitle}>{reservation.eventTitle}</div>
+                  <div className="text-sm text-gray-700 whitespace-normal break-words">{reservation.department}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 py-4 align-top max-w-[140px]">
                   <div className="flex items-center">
                     <span 
                       className="w-3 h-3 rounded-full mr-2 flex-shrink-0" 
                       style={{ backgroundColor: venueColors[reservation.venueId] }}
                     />
-                    <span className="text-sm text-gray-700">{reservation.venueName}</span>
+                    <span className="text-sm text-gray-700 truncate" title={reservation.venueName}>{reservation.venueName}</span>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                <td className="px-4 py-4 text-sm text-gray-700 hidden md:table-cell align-top max-w-[120px] truncate">
                   {reservation.startDate === reservation.endDate
                     ? formatDate(reservation.startDate)
                     : `${formatDate(reservation.startDate)} - ${formatDate(reservation.endDate)}`}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                  {reservation.startTime} - {reservation.endTime}
+                <td className="px-4 py-4 text-sm text-gray-700 hidden md:table-cell align-top">
+                  {formatTime(reservation.startTime)} - {formatTime(reservation.endTime)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{reservation.reservedBy}</div>
-                  <div className="text-sm text-gray-700">{reservation.email}</div>
+                <td className="px-4 py-4 hidden md:table-cell align-top max-w-[120px]">
+                  <div className="text-sm text-gray-900 truncate" title={reservation.reservedBy}>{reservation.reservedBy}</div>
+                  <div className="text-sm text-gray-700 truncate" title={reservation.contactNo}>{reservation.contactNo}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 py-4 whitespace-nowrap hidden md:table-cell align-top">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                     reservation.status === 'Confirmed' 
                       ? 'bg-green-100 text-green-800' 
@@ -316,7 +355,7 @@ export default function ReservationList() {
                     {reservation.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                <td className="px-4 py-4 whitespace-nowrap text-center text-sm align-top">
                   <div className="flex justify-center space-x-2">
                     <button
                       onClick={() => {
@@ -377,8 +416,8 @@ export default function ReservationList() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => { setShowDeleteModal(false); setReservationToDelete(null); }}>
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full" onClick={e => e.stopPropagation()}>
             <div className="p-6">
               <h3 className="text-lg font-bold mb-4 text-gray-900">Confirm Deletion</h3>
               <p className="text-gray-700 mb-4">
@@ -411,8 +450,8 @@ export default function ReservationList() {
 
       {/* Reservation Details Modal */}
       {showDetailsModal && selectedReservation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => setShowDetailsModal(false)}>
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-6">
               <h3 className="text-xl font-bold mb-6 text-gray-900">
                 Reservation Details
@@ -455,7 +494,7 @@ export default function ReservationList() {
                       <FiClock className="text-gray-500 mr-2" size={16} />
                       <p className="text-sm font-medium text-gray-700">Time</p>
                     </div>
-                    <p className="text-gray-900 ml-6">{selectedReservation.startTime} - {selectedReservation.endTime}</p>
+                    <p className="text-gray-900 ml-6">{formatTime(selectedReservation.startTime)} - {formatTime(selectedReservation.endTime)}</p>
                   </div>
                   
                   <div>
@@ -481,10 +520,32 @@ export default function ReservationList() {
                   <div>
                     <div className="flex items-center mb-2">
                       <FiMail className="text-gray-500 mr-2" size={16} />
-                      <p className="text-sm font-medium text-gray-700">Email</p>
+                      <p className="text-sm font-medium text-gray-700">Contact No</p>
                     </div>
-                    <p className="text-gray-900 ml-6">{selectedReservation.email}</p>
+                    <p className="text-gray-900 ml-6">{selectedReservation.contactNo}</p>
                   </div>
+                  
+                  <div>
+                    <div className="flex items-center mb-2">
+                      <FiUser className="text-gray-500 mr-2" size={16} />
+                      <p className="text-sm font-medium text-gray-700">Received By</p>
+                    </div>
+                    <p className="text-gray-900 ml-6">{selectedReservation.receivedBy}</p>
+                  </div>
+                </div>
+                
+                {/* Created At */}
+                <div className="border-t border-gray-200 pt-4">
+                  <div className="flex items-center mb-2">
+                    <FiCalendar className="text-gray-500 mr-2" size={16} />
+                    <p className="text-sm font-medium text-gray-700">Added on</p>
+                  </div>
+                  <p className="text-gray-900 ml-6">
+                    {selectedReservation.createdAt &&
+                      (typeof selectedReservation.createdAt === 'string'
+                        ? formatDate(selectedReservation.createdAt)
+                        : formatDate(selectedReservation.createdAt.toDate ? selectedReservation.createdAt.toDate() : selectedReservation.createdAt))}
+                  </p>
                 </div>
                 
                 {/* Notes Section */}

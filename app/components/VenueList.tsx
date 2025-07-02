@@ -69,6 +69,16 @@ export default function VenueList() {
     return format(new Date(dateString), 'MMM d, yyyy');
   };
 
+  const formatTime = (timeString: string): string => {
+    if (!timeString) return '';
+    const [hours, minutes] = timeString.split(':');
+    const date = new Date();
+    date.setHours(Number(hours));
+    date.setMinutes(Number(minutes));
+    date.setSeconds(0);
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+
   // Generate unique colors for each venue
   const venueColors = venues.reduce((acc, venue, index) => {
     const hue = (index * 137.5) % 360; // Golden ratio to distribute colors
@@ -151,8 +161,8 @@ export default function VenueList() {
 
       {/* Modal for date details */}
       {showModal && selectedDate && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => { setShowModal(false); setSelectedDate(null); }}>
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-6">
               <h3 className="text-2xl font-bold text-gray-900 mb-6">
                 Reservations for {formatDate(selectedDate)}
@@ -169,11 +179,15 @@ export default function VenueList() {
                     <div className="text-gray-700 mt-2 space-y-1">
                       <p className="flex items-center">
                         <span className="font-medium mr-2">Time:</span>
-                        {res.startTime} - {res.endTime}
+                        {formatTime(res.startTime)} - {formatTime(res.endTime)}
                       </p>
                       <p className="flex items-center">
                         <span className="font-medium mr-2">Reserved by:</span>
                         {res.reservedBy}
+                      </p>
+                      <p className="flex items-center">
+                        <span className="font-medium mr-2">Received by:</span>
+                        {res.receivedBy}
                       </p>
                     </div>
                   </div>

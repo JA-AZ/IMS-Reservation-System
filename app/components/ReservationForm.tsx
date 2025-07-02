@@ -17,7 +17,7 @@ export default function ReservationForm() {
     department: '',
     eventTitle: '',
     reservedBy: '',
-    email: '',
+    contactNo: '',
     startDate: '',
     endDate: '',
     startTime: '',
@@ -108,7 +108,7 @@ export default function ReservationForm() {
         department: '',
         eventTitle: '',
         reservedBy: '',
-        email: '',
+        contactNo: '',
         startDate: '',
         endDate: '',
         startTime: '',
@@ -129,6 +129,16 @@ export default function ReservationForm() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatTime = (timeString: string): string => {
+    if (!timeString) return '';
+    const [hours, minutes] = timeString.split(':');
+    const date = new Date();
+    date.setHours(Number(hours));
+    date.setMinutes(Number(minutes));
+    date.setSeconds(0);
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
   return (
@@ -222,19 +232,19 @@ export default function ReservationForm() {
               />
             </div>
             
-            {/* Email Address */}
+            {/* Contact No */}
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-1">
-                Email Address
+                Contact No
               </label>
               <input
-                type="email"
-                name="email"
-                value={formData.email}
+                type="text"
+                name="contactNo"
+                value={formData.contactNo}
                 onChange={handleChange}
                 required
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-                placeholder="Enter email address"
+                placeholder="Enter contact number"
               />
             </div>
             

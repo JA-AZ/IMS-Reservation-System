@@ -12,6 +12,7 @@ export type StaffMember = {
   name: string;
   email: string;
   role: string;
+  contactNo?: string;
 };
 
 export type ReservationStatus = 'Processing' | 'Reserved' | 'Confirmed' | 'Cancelled';
@@ -23,14 +24,14 @@ export type Reservation = {
   department: string;
   eventTitle: string;
   reservedBy: string;
-  email: string;
+  contactNo: string;
   startDate: string;
   endDate: string; // Same as startDate for single-day events
   startTime: string;
   endTime: string;
   status: ReservationStatus;
   receivedBy: string;
-  notes?: string; // Optional notes/details field
+  notes: string; // Notes/details field is now required
   createdAt: any; // Firestore Timestamp
   updatedAt: any; // Firestore Timestamp
 }; 

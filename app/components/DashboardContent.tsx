@@ -13,7 +13,9 @@ export default function DashboardContent() {
   const [allReservations, setAllReservations] = useState<Reservation[]>([]);
   const [venues, setVenues] = useState<VenueType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [timeframe, setTimeframe] = useState<'today' | 'week' | 'month'>('today');
+  const [timeframe, setTimeframe] = useState<'today' | 'week' | 'month'>('week');
+  const [selectedEvent, setSelectedEvent] = useState<Reservation | null>(null);
+  const [showEventModal, setShowEventModal] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -44,7 +46,14 @@ export default function DashboardContent() {
   };
   
   const formatTime = (timeString: string) => {
-    return timeString;
+    if (!timeString) return '';
+    // Assume timeString is 'HH:mm' or 'HH:mm:ss'
+    const [hours, minutes] = timeString.split(':');
+    const date = new Date();
+    date.setHours(Number(hours));
+    date.setMinutes(Number(minutes));
+    date.setSeconds(0);
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
   // Calculate statistics
@@ -94,12 +103,23 @@ export default function DashboardContent() {
   };
   
   const getFilteredEvents = () => {
-    return allReservations.filter(res => {
+    const now = new Date();
+    const filtered = allReservations.filter(res => {
       const startDate = parseISO(res.startDate);
+      const endDate = parseISO(res.endDate);
       if (timeframe === 'today') return isToday(startDate);
-      if (timeframe === 'week') return isThisWeek(startDate);
+      if (timeframe === 'week') {
+        // Only include if event is this week and not fully in the past
+        return isThisWeek(startDate) && (endDate >= now);
+      }
       if (timeframe === 'month') return isThisMonth(startDate);
       return true;
+    });
+    // Sort by startDate and startTime ascending
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.startDate + 'T' + a.startTime);
+      const dateB = new Date(b.startDate + 'T' + b.startTime);
+      return dateA.getTime() - dateB.getTime();
     });
   };
   
@@ -220,25 +240,29 @@ export default function DashboardContent() {
 
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Today's Events */}
+        {/* This Week's Events */}
         <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold flex items-center text-gray-900">
-              <FiCalendar className="mr-2" /> Today's Events
+              <FiCalendar className="mr-2" /> This Week's Events
             </h2>
             <Link href="/reservations" className="text-sm text-blue-600 hover:text-blue-800">
               View All
             </Link>
           </div>
-          
           {loading ? (
             <div className="h-64 flex items-center justify-center">
               <div className="animate-pulse text-gray-500">Loading...</div>
             </div>
-          ) : todayEvents.length > 0 ? (
-            <div className="space-y-4">
-              {todayEvents.map((event) => (
-                <div key={event.id} className="border-l-4 pl-4 py-3 bg-gray-50 rounded-r-lg" style={{ borderColor: venueColors[event.venueId] }}>
+          ) : getFilteredEvents().length > 0 ? (
+            <div className="space-y-4 overflow-y-auto max-h-[400px] pr-2">
+              {getFilteredEvents().map((event) => (
+                <div
+                  key={event.id}
+                  className="border-l-4 pl-4 py-3 bg-gray-50 rounded-r-lg cursor-pointer hover:bg-gray-100 transition"
+                  style={{ borderColor: venueColors[event.venueId] }}
+                  onClick={() => { setSelectedEvent(event); setShowEventModal(true); }}
+                >
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                     <div>
                       <h3 className="font-medium text-gray-900">{event.eventTitle}</h3>
@@ -250,6 +274,10 @@ export default function DashboardContent() {
                         <p className="flex items-center">
                           <FiMapPin className="mr-2" size={14} />
                           {event.venueName}
+                        </p>
+                        <p className="flex items-center">
+                          <FiCalendar className="mr-2" size={14} />
+                          {event.startDate === event.endDate ? formatDate(event.startDate) : `${formatDate(event.startDate)} - ${formatDate(event.endDate)}`}
                         </p>
                       </div>
                     </div>
@@ -272,7 +300,7 @@ export default function DashboardContent() {
             </div>
           ) : (
             <div className="h-64 flex items-center justify-center text-gray-500">
-              No events scheduled for today.
+              No events scheduled for this week.
             </div>
           )}
         </div>
@@ -431,6 +459,76 @@ export default function DashboardContent() {
           </div>
         )}
       </div>
+      {/* Event Details Modal */}
+      {showEventModal && selectedEvent && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => setShowEventModal(false)}>
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="p-6">
+              <h3 className="text-xl font-bold mb-4 text-gray-900">Event Details</h3>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-sm text-gray-500">Event Title</p>
+                    <p className="font-medium text-gray-900">{selectedEvent.eventTitle}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Venue</p>
+                    <p className="font-medium text-gray-900">{selectedEvent.venueName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Date(s)</p>
+                    <p className="font-medium text-gray-900">{selectedEvent.startDate === selectedEvent.endDate ? formatDate(selectedEvent.startDate) : `${formatDate(selectedEvent.startDate)} - ${formatDate(selectedEvent.endDate)}`}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Time</p>
+                    <p className="font-medium text-gray-900">{formatTime(selectedEvent.startTime)} - {formatTime(selectedEvent.endTime)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Reserved By</p>
+                    <p className="font-medium text-gray-900">{selectedEvent.reservedBy}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Received By</p>
+                    <p className="font-medium text-gray-900">{selectedEvent.receivedBy}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Contact No.</p>
+                    <p className="font-medium text-gray-900">{selectedEvent.contactNo}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Status</p>
+                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      selectedEvent.status === 'Confirmed' 
+                        ? 'bg-green-100 text-green-800' 
+                        : selectedEvent.status === 'Cancelled' 
+                          ? 'bg-red-100 text-red-800'
+                          : selectedEvent.status === 'Processing'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {selectedEvent.status}
+                    </span>
+                  </div>
+                </div>
+                {selectedEvent.notes && (
+                  <div>
+                    <p className="text-sm text-gray-500">Notes</p>
+                    <p className="font-medium text-gray-900 whitespace-pre-wrap">{selectedEvent.notes}</p>
+                  </div>
+                )}
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setShowEventModal(false)}
+                  className="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

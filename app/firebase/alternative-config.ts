@@ -15,8 +15,8 @@ const firebaseConfig = {
   appId: "YOUR_APP_ID_HERE"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase with a unique name to avoid conflicts
+const app = initializeApp(firebaseConfig, "TEST_CONFIG");
 const db = getFirestore(app);
 const auth = getAuth(app);
 

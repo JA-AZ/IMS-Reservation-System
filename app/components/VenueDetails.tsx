@@ -210,6 +210,17 @@ export default function VenueDetails({ venueId }: VenueDetailsProps) {
     }
   };
 
+  // Get reservations for a specific date (excluding cancelled)
+  const getReservationsForDate = (dateStr: string | null) => {
+    if (!dateStr) return [];
+    return reservations.filter(res => {
+      // Exclude cancelled
+      if (res.status === 'Cancelled') return false;
+      // Check if the date is within the reservation period
+      return dateStr >= res.startDate && dateStr <= res.endDate;
+    });
+  };
+
   if (loading) {
     return <div className="text-center py-8">Loading venue details...</div>;
   }
@@ -229,12 +240,12 @@ export default function VenueDetails({ venueId }: VenueDetailsProps) {
   return (
     <div className="space-y-8">
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4">
           <h1 className="text-2xl font-bold flex items-center text-gray-900">
             <FiMapPin className="mr-2" />
             {venue.name}
           </h1>
-          <div className="flex space-x-2">
+          <div className="flex flex-col gap-2 md:flex-row md:space-x-2">
             <Link
               href={`/new-reservation?venue=${venueId}`}
               className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -439,7 +450,7 @@ export default function VenueDetails({ venueId }: VenueDetailsProps) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">{reservation.reservedBy}</div>
-                        <div className="text-sm text-gray-500">{reservation.email}</div>
+                        <div className="text-sm text-gray-500">{reservation.contactNo}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -506,8 +517,8 @@ export default function VenueDetails({ venueId }: VenueDetailsProps) {
       
       {/* Modal for reservation details */}
       {showModal && (selectedDate || selectedReservation) && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => { setShowModal(false); setSelectedDate(null); setSelectedReservation(null); }}>
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-6">
               <h3 className="text-xl font-bold mb-4 text-gray-900">
                 {selectedDate 
@@ -517,27 +528,29 @@ export default function VenueDetails({ venueId }: VenueDetailsProps) {
               
               {selectedDate && (
                 <div className="space-y-4">
-                  {reservations
-                    .filter(res => selectedDate >= res.startDate && selectedDate <= res.endDate)
-                    .map(res => (
-                      <div key={res.id} className="border-l-4 border-blue-500 pl-4 py-2">
-                        <h4 className="font-medium text-gray-900">{res.eventTitle}</h4>
-                        <div className="text-gray-700 mt-1 space-y-1">
-                          <p className="flex items-center text-gray-800">
-                            <FiClock className="mr-2" size={14} />
-                            {res.startTime} - {res.endTime}
-                          </p>
-                          <p className="flex items-center text-gray-800">
-                            <FiUser className="mr-2" size={14} />
-                            {res.reservedBy}
-                          </p>
-                          <p className="flex items-center text-gray-800">
-                            <FiMail className="mr-2" size={14} />
-                            {res.email}
-                          </p>
-                        </div>
+                  {getReservationsForDate(selectedDate).map(res => (
+                    <div key={res.id} className="border-l-4 border-blue-500 pl-4 py-2">
+                      <h4 className="font-medium text-gray-900">{res.eventTitle}</h4>
+                      <div className="text-gray-700 mt-1 space-y-1">
+                        <p className="flex items-center text-gray-800">
+                          <FiClock className="mr-2" size={14} />
+                          {res.startTime} - {res.endTime}
+                        </p>
+                        <p className="flex items-center text-gray-800">
+                          <FiUser className="mr-2" size={14} />
+                          {res.reservedBy}
+                        </p>
+                        <p className="flex items-center text-gray-800">
+                          <FiMail className="mr-2" size={14} />
+                          {res.contactNo}
+                        </p>
+                        <p className="flex items-center text-gray-800">
+                          <span className="font-medium mr-2">Received by:</span>
+                          {res.receivedBy}
+                        </p>
                       </div>
-                    ))}
+                    </div>
+                  ))}
                 </div>
               )}
               
@@ -557,8 +570,8 @@ export default function VenueDetails({ venueId }: VenueDetailsProps) {
                       <p className="font-medium text-gray-900">{selectedReservation.reservedBy}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Email</p>
-                      <p className="font-medium text-gray-900">{selectedReservation.email}</p>
+                      <p className="text-sm text-gray-500">Contact No</p>
+                      <p className="font-medium text-gray-900">{selectedReservation.contactNo}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">Date(s)</p>
