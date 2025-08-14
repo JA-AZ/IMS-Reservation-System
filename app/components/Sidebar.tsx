@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { FiHome, FiCalendar, FiPlusSquare, FiSettings, FiMapPin, FiChevronDown, FiChevronRight } from 'react-icons/fi';
+import { FiHome, FiCalendar, FiPlusSquare, FiSettings, FiMapPin, FiChevronDown, FiChevronRight, FiPackage, FiClipboard, FiClock } from 'react-icons/fi';
 import { getVenues } from '../firebase/services';
 import { VenueType } from '../types';
 
@@ -48,6 +48,11 @@ export default function Sidebar({ isOpen, closeSidebar }: SidebarProps) {
     { path: '/reservations', label: 'Reservations', icon: <FiCalendar size={20} /> },
     { path: '/new-reservation', label: 'New Reservation', icon: <FiPlusSquare size={20} /> },
     { path: '/venues', label: 'Venues', icon: <FiSettings size={20} /> },
+    // Item Borrowing System
+    { path: '/items', label: 'Items', icon: <FiPackage size={20} /> },
+    { path: '/item-borrowings', label: 'Item Borrowings', icon: <FiClipboard size={20} /> },
+    { path: '/new-item-borrowing', label: 'New Item Borrowing', icon: <FiPlusSquare size={20} /> },
+    { path: '/item-borrowing-calendar', label: 'Item Borrowing Calendar', icon: <FiClock size={20} /> },
   ];
   
   return (
