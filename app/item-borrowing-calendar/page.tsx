@@ -38,7 +38,7 @@ export default function ItemBorrowingCalendarPage() {
   };
   
   // Generate time slots from 7 AM to 10 PM with 30-minute intervals
-  const timeSlots = [];
+  const timeSlots: string[] = [];
   for (let hour = 7; hour <= 22; hour++) {
     timeSlots.push(`${hour.toString().padStart(2, '0')}:00`);
     if (hour < 22) { // Don't add 30-minute slot for 10 PM

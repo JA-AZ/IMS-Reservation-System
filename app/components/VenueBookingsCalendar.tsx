@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { FiCalendar, FiChevronLeft, FiChevronRight, FiClock, FiUser, FiMail } from 'react-icons/fi';
+import { FiCalendar, FiChevronLeft, FiChevronRight, FiClock, FiUser, FiMail, FiEye, FiEdit } from 'react-icons/fi';
 import { getVenues, getReservations } from '../firebase/services';
 import { VenueType, Reservation } from '../types';
 import { format, addMonths, subMonths } from 'date-fns';
@@ -32,6 +32,8 @@ export default function VenueBookingsCalendar() {
   const [error, setError] = useState('');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
   const [hoverPosition, setHoverPosition] = useState({ 
     x: 0, 
@@ -232,6 +234,16 @@ export default function VenueBookingsCalendar() {
     if (!dateStr) return;
     setSelectedDate(dateStr);
     setShowModal(true);
+  };
+
+  const handleViewDetails = (reservation: Reservation) => {
+    setSelectedReservation(reservation);
+    setShowDetailsModal(true);
+  };
+
+  const handleEditReservation = (reservationId: string) => {
+    // Navigate to edit page in the same tab
+    window.location.href = `/reservations/edit/${reservationId}`;
   };
 
   // Calculate tooltip height dynamically based on content
@@ -509,30 +521,50 @@ export default function VenueBookingsCalendar() {
                     className="border-l-4 pl-4 py-3 bg-gray-50 rounded-r-lg" 
                     style={{ borderColor: venueColors[res.venueName] }}
                   >
-                    <h4 className="font-semibold text-gray-900 text-lg">{res.venueName} - {res.eventTitle}</h4>
-                    <div className="text-gray-700 mt-2 space-y-1">
-                      <p className="flex items-center text-gray-800">
-                        <span className="font-medium mr-2">Time:</span>
-                        {formatTime(res.startTime)} - {formatTime(res.endTime)}
-                      </p>
-                      <p className="flex items-center text-gray-800">
-                        <span className="font-medium mr-2">Reserved by:</span>
-                        {res.reservedBy}
-                      </p>
-                      <p className="flex items-center text-gray-800">
-                        <span className="font-medium mr-2">Received by:</span>
-                        {res.receivedBy}
-                      </p>
-                      <p className="flex items-center text-gray-800">
-                        <span className="font-medium mr-2">Contact No.:</span>
-                        {res.contactNo}
-                      </p>
-                      {res.notes && (
-                        <p className="flex items-start text-gray-800">
-                          <span className="font-medium mr-2">Notes:</span>
-                          <span className="whitespace-pre-wrap">{res.notes}</span>
-                        </p>
-                      )}
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900 text-lg">{res.venueName} - {res.eventTitle}</h4>
+                        <div className="text-gray-700 mt-2 space-y-1">
+                          <p className="flex items-center text-gray-800">
+                            <span className="font-medium mr-2">Time:</span>
+                            {formatTime(res.startTime)} - {formatTime(res.endTime)}
+                          </p>
+                          <p className="flex items-center text-gray-800">
+                            <span className="font-medium mr-2">Reserved by:</span>
+                            {res.reservedBy}
+                          </p>
+                          <p className="flex items-center text-gray-800">
+                            <span className="font-medium mr-2">Received by:</span>
+                            {res.receivedBy}
+                          </p>
+                          <p className="flex items-center text-gray-800">
+                            <span className="font-medium mr-2">Contact No.:</span>
+                            {res.contactNo}
+                          </p>
+                          {res.notes && (
+                            <p className="flex items-start text-gray-800">
+                              <span className="font-medium mr-2">Notes:</span>
+                              <span className="whitespace-pre-wrap">{res.notes}</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-center space-x-2 ml-4 mr-2">
+                        <button
+                          onClick={() => handleViewDetails(res)}
+                          className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          title="View Details"
+                        >
+                          <FiEye size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleEditReservation(res.id!)}
+                          className="flex items-center justify-center w-8 h-8 bg-green-100 text-green-600 rounded-md hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+                          title="Edit Reservation"
+                        >
+                          <FiEdit size={16} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -548,6 +580,133 @@ export default function VenueBookingsCalendar() {
                 >
                   Close
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reservation Details Modal */}
+      {showDetailsModal && selectedReservation && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => setShowDetailsModal(false)}>
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="p-6">
+              <h3 className="text-xl font-bold mb-6 text-gray-900">
+                Reservation Details
+              </h3>
+              
+              <div className="space-y-6">
+                {/* Header Info */}
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-4 border-b border-gray-200">
+                  <div>
+                    <h4 className="text-lg font-medium text-gray-900">{selectedReservation.eventTitle}</h4>
+                    <p className="text-gray-600">{selectedReservation.department}</p>
+                  </div>
+                  <div className="mt-2 md:mt-0">
+                    <span className={`px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full ${
+                      selectedReservation.status === 'Confirmed' 
+                        ? 'bg-green-100 text-green-800' 
+                        : selectedReservation.status === 'Cancelled' 
+                          ? 'bg-red-100 text-red-800'
+                          : selectedReservation.status === 'Processing'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {selectedReservation.status}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-sm text-gray-500">Venue</p>
+                    <p className="font-medium text-gray-900">{selectedReservation.venueName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Department</p>
+                    <p className="font-medium text-gray-900">{selectedReservation.department}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Event Title</p>
+                    <p className="font-medium text-gray-900">{selectedReservation.eventTitle}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Status</p>
+                    <p>
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        selectedReservation.status === 'Confirmed' 
+                          ? 'bg-green-100 text-green-800' 
+                          : selectedReservation.status === 'Cancelled' 
+                            ? 'bg-red-100 text-red-800'
+                            : selectedReservation.status === 'Processing'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {selectedReservation.status}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Start Date</p>
+                    <p className="font-medium text-gray-900">{formatDate(selectedReservation.startDate)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">End Date</p>
+                    <p className="font-medium text-gray-900">{formatDate(selectedReservation.endDate)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Start Time</p>
+                    <p className="font-medium text-gray-900">{formatTime(selectedReservation.startTime)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">End Time</p>
+                    <p className="font-medium text-gray-900">{formatTime(selectedReservation.endTime)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Reserved By</p>
+                    <p className="font-medium text-gray-900">{selectedReservation.reservedBy}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Received By</p>
+                    <p className="font-medium text-gray-900">{selectedReservation.receivedBy}</p>
+                  </div>
+                                     <div>
+                     <p className="text-sm text-gray-500">Contact Number</p>
+                     <p className="font-medium text-gray-900">{selectedReservation.contactNo}</p>
+                   </div>
+                   <div>
+                     <p className="text-sm text-gray-500">Added on</p>
+                     <p className="font-medium text-gray-900">
+                       {selectedReservation.createdAt &&
+                         (typeof selectedReservation.createdAt === 'string'
+                           ? formatDate(selectedReservation.createdAt)
+                           : formatDate(selectedReservation.createdAt.toDate ? selectedReservation.createdAt.toDate() : selectedReservation.createdAt))}
+                     </p>
+                   </div>
+                   {selectedReservation.notes && (
+                     <div className="md:col-span-2">
+                       <p className="text-sm text-gray-500">Notes</p>
+                       <p className="font-medium text-gray-900 whitespace-pre-wrap">{selectedReservation.notes}</p>
+                     </div>
+                   )}
+                </div>
+                
+                {/* Actions */}
+                <div className="flex justify-end space-x-3 border-t border-gray-200 pt-4">
+                  <Link
+                    href={`/reservations/edit/${selectedReservation.id}`}
+                    className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Edit Reservation
+                  </Link>
+                  <button
+                    onClick={() => setShowDetailsModal(false)}
+                    className="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 focus:outline-none"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>
