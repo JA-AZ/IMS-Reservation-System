@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Borrower's Form</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ---
+        Custom styles for printing on 8.5" x 13" (legal size paper).
+        The page dimensions are set here.
+        --- */
+        @media print {
+            @page {
+                size: 8.5in 13in;
+                margin: 0.25in; /* Smaller margin for more content space */
+            }
+            body {
+                -webkit-print-color-adjust: exact; /* Ensures colors and borders print correctly */
+                print-color-adjust: exact;
+                margin: 0;
+                padding: 0;
+            }
+            .no-print {
+                display: none; /* Hide elements like the print button when printing */
+            }
+            .page-break {
+                page-break-before: always;
+            }
+        }
+        body {
+            font-family: 'Inter', sans-serif, Arial;
+            margin: 0;
+            padding: 0;
+            background: white;
+        }
+        /* ---
+        Helper class for the underline effect for form fields.
+        A bottom border creates the line to write on.
+        --- */
+        .form-line {
+            border-bottom: 1px solid black;
+            padding-bottom: 1px;
+            min-height: 16px;
+        }
+        /* ---
+        Simple square for the Yes/No checkbox.
+        --- */
+        .checkbox {
+            width: 12px;
+            height: 12px;
+            border: 1px solid black;
+            display: inline-block;
+            vertical-align: middle; /* Aligns checkbox with text */
+        }
+        /* ---
+        For populated data fields
+        --- */
+        .populated-field {
+            border-bottom: 1px solid black;
+            padding-bottom: 1px;
+            min-height: 16px;
+            font-size: 11px;
+        }
+        /* ---
+        Smaller font for borrowed items to fit better
+        --- */
+        .borrowed-item {
+            font-size: 9px;
+            line-height: 1.2;
+            margin-bottom: 2px;
+        }
+        .serial-number {
+            font-size: 9px;
+            line-height: 1.2;
+            margin-bottom: 2px;
+        }
+        /* ---
+        Container for legal size paper
+        --- */
+        .legal-page {
+            width: 8.5in;
+            height: 13in;
+            margin: 0 auto;
+            background: white;
+            position: relative;
+            box-sizing: border-box;
+        }
+        /* ---
+        Form container with proper spacing
+        --- */
+        .form-container {
+            border: 2px solid black;
+            padding: 12px;
+            height: 48%;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 8px;
+        }
+        /* ---
+        Header styling
+        --- */
+        .form-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 8px;
+            border-bottom: 2px solid black;
+            margin-bottom: 8px;
+        }
+        .logo {
+            height: 40px;
+            width: auto;
+        }
+        .header-title {
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .form-title {
+            font-size: 16px;
+            font-weight: bold;
+            text-align: right;
+        }
+        /* ---
+        Borrower info section
+        --- */
+        .borrower-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+            font-size: 11px;
+        }
+        .borrower-left {
+            width: 48%;
+        }
+        .borrower-right {
+            width: 48%;
+        }
+        /* ---
+        Items section
+        --- */
+        .items-section {
+            border: 2px solid black;
+            padding: 8px;
+            flex-grow: 1;
+            margin-bottom: 8px;
+        }
+        .items-grid {
+            display: flex;
+            height: 100%;
+        }
+        .items-left {
+            width: 50%;
+            padding-right: 8px;
+            border-right: 1px solid black;
+        }
+        .items-right {
+            width: 50%;
+            padding-left: 8px;
+        }
+        .items-title {
+            font-size: 10px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        /* ---
+        Details section
+        --- */
+        .details-section {
+            display: flex;
+            margin-bottom: 8px;
+            font-size: 10px;
+        }
+        .details-left {
+            width: 50%;
+            padding-right: 8px;
+        }
+        .details-right {
+            width: 50%;
+            border: 2px solid black;
+            padding: 8px;
+        }
+        .detail-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        .detail-label {
+            width: 80px;
+            font-weight: bold;
+        }
+        /* ---
+        Footer section
+        --- */
+        .footer-section {
+            margin-top: auto;
+            padding-top: 8px;
+            font-size: 10px;
+        }
+        .footer-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 8px;
+        }
+        .footer-left {
+            width: 48%;
+        }
+        .footer-right {
+            width: 48%;
+        }
+        .approval-title {
+            font-size: 8px;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 2px;
+        }
+        .return-condition {
+            text-align: right;
+            margin-top: 4px;
+            font-size: 9px;
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Teko:wght@700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- Legal size page container -->
+    <div class="legal-page">
+        
+        <!-- First Copy of the Form -->
+        <div class="form-container">
+            <!-- Header Section -->
+            <div class="form-header">
+                <div>
+                    <img src="https://i.imgur.com/uV5b5s5.jpeg" alt="University of Cebu Logo" class="logo">
+                </div>
+                <div class="header-title">
+                    INSTRUCTIONAL MEDIA SERVICES (IMS)
+                </div>
+                <div class="form-title">
+                    BORROWER'S FORM
+                </div>
+            </div>
+
+            <!-- Borrower Info Section -->
+            <div class="borrower-info">
+                <div class="borrower-left">
+                    <div class="detail-row">
+                        <span style="margin-right: 8px;">Borrower's Name:</span>
+                        <div class="populated-field" id="borrower-name-1"></div>
+                    </div>
+                </div>
+                <div class="borrower-right">
+                    <div class="detail-row">
+                        <span style="margin-right: 8px;">Department:</span>
+                        <div class="populated-field" id="department-1"></div>
+                    </div>
+                    <div class="detail-row" style="margin-top: 4px;">
+                        <span style="margin-right: 8px;">Teacher's Name and Signature:</span>
+                        <div class="form-line"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Borrowed Items Section -->
+            <div class="items-section">
+                <div class="items-grid">
+                    <div class="items-left">
+                        <div class="items-title">BORROWED MATERIALS/ITEMS</div>
+                        <div id="borrowed-items-1"></div>
+                    </div>
+                    <div class="items-right">
+                        <div class="items-title">DESCRIPTION/TITLE/SERIAL No.</div>
+                        <div id="serial-numbers-1"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Details Section -->
+            <div class="details-section">
+                <div class="details-left">
+                    <div class="detail-row">
+                        <span class="detail-label">PURPOSE:</span>
+                        <div class="populated-field" id="purpose-1"></div>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">DATE OF USE:</span>
+                        <div class="populated-field" id="date-of-use-1"></div>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">TIME OF USE:</span>
+                        <div class="populated-field" id="time-of-use-1"></div>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">PLACE OR ROOM NO:</span>
+                        <div class="populated-field" id="room-location-1"></div>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">DUE DATE & TIME:</span>
+                        <div class="populated-field" id="due-date-time-1"></div>
+                    </div>
+                </div>
+                <div class="details-right">
+                    <div class="detail-row">
+                        <span class="detail-label">DATE RECEIVED:</span>
+                        <div class="form-line"></div>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">RECEIVED BY:</span>
+                        <div class="form-line"></div>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">I.D. NUMBER:</span>
+                        <div class="form-line"></div>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">SIGNATURE:</span>
+                        <div class="form-line"></div>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">RELEASED BY:</span>
+                        <div class="form-line"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer Section -->
+            <div class="footer-section">
+                <div class="footer-row">
+                    <div class="footer-left">
+                        <div class="detail-row">
+                            <span style="margin-right: 8px;">Approved By:</span>
+                            <div class="form-line"></div>
+                        </div>
+                        <div class="approval-title">IMS DIRECTOR</div>
+                    </div>
+                    <div class="footer-right">
+                        <div class="detail-row">
+                            <span style="margin-right: 8px;">DATE & TIME RETURNED:</span>
+                            <div class="form-line"></div>
+                        </div>
+                        <div class="return-condition">
+                            RETURNED IN GOOD CONDITION: YES <span class="checkbox"></span> NO <span class="checkbox"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="footer-row">
+                    <div class="footer-left">
+                        <div class="detail-row">
+                            <span style="margin-right: 8px;">Booking Received By:</span>
+                            <div class="populated-field" id="received-by-1"></div>
+                        </div>
+                    </div>
+                    <div class="footer-right">
+                        <div class="detail-row">
+                            <span style="margin-right: 8px;">Booking Finalized By:</span>
+                            <div class="form-line"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Second Copy of the Form -->
+        <div class="form-container">
+            <!-- Header Section -->
+            <div class="form-header">
+                <div>
+                    <img src="https://i.imgur.com/uV5b5s5.jpeg" alt="University of Cebu Logo" class="logo">
+                </div>
+                <div class="header-title">
+                    INSTRUCTIONAL MEDIA SERVICES (IMS)
+                </div>
+                <div class="form-title">
+                    BORROWER'S FORM
+                </div>
+            </div>
+
+            <!-- Borrower Info Section -->
+            <div class="borrower-info">
+                <div class="borrower-left">
+                    <div class="detail-row">
+                        <span style="margin-right: 8px;">Borrower's Name:</span>
+                        <div class="populated-field" id="borrower-name-2"></div>
+                    </div>
+                </div>
+                <div class="borrower-right">
+                    <div class="detail-row">
+                        <span style="margin-right: 8px;">Department:</span>
+                        <div class="populated-field" id="department-2"></div>
+                    </div>
+                    <div class="detail-row" style="margin-top: 4px;">
+                        <span style="margin-right: 8px;">Teacher's Name and Signature:</span>
+                        <div class="form-line"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Borrowed Items Section -->
+            <div class="items-section">
+                <div class="items-grid">
+                    <div class="items-left">
+                        <div class="items-title">BORROWED MATERIALS/ITEMS</div>
+                        <div id="borrowed-items-2"></div>
+                    </div>
+                    <div class="items-right">
+                        <div class="items-title">DESCRIPTION/TITLE/SERIAL No.</div>
+                        <div id="serial-numbers-2"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Details Section -->
+            <div class="details-section">
+                <div class="details-left">
+                    <div class="detail-row">
+                        <span class="detail-label">PURPOSE:</span>
+                        <div class="populated-field" id="purpose-2"></div>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">DATE OF USE:</span>
+                        <div class="populated-field" id="date-of-use-2"></div>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">TIME OF USE:</span>
+                        <div class="populated-field" id="time-of-use-2"></div>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">PLACE OR ROOM NO:</span>
+                        <div class="populated-field" id="room-location-2"></div>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">DUE DATE & TIME:</span>
+                        <div class="populated-field" id="due-date-time-2"></div>
+                    </div>
+                </div>
+                <div class="details-right">
+                    <div class="detail-row">
+                        <span class="detail-label">DATE RECEIVED:</span>
+                        <div class="form-line"></div>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">RECEIVED BY:</span>
+                        <div class="form-line"></div>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">I.D. NUMBER:</span>
+                        <div class="form-line"></div>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">SIGNATURE:</span>
+                        <div class="form-line"></div>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">RELEASED BY:</span>
+                        <div class="form-line"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer Section -->
+            <div class="footer-section">
+                <div class="footer-row">
+                    <div class="footer-left">
+                        <div class="detail-row">
+                            <span style="margin-right: 8px;">Approved By:</span>
+                            <div class="form-line"></div>
+                        </div>
+                        <div class="approval-title">IMS DIRECTOR</div>
+                    </div>
+                    <div class="footer-right">
+                        <div class="detail-row">
+                            <span style="margin-right: 8px;">DATE & TIME RETURNED:</span>
+                            <div class="form-line"></div>
+                        </div>
+                        <div class="return-condition">
+                            RETURNED IN GOOD CONDITION: YES <span class="checkbox"></span> NO <span class="checkbox"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="footer-row">
+                    <div class="footer-left">
+                        <div class="detail-row">
+                            <span style="margin-right: 8px;">Booking Received By:</span>
+                            <div class="populated-field" id="received-by-2"></div>
+                        </div>
+                    </div>
+                    <div class="footer-right">
+                        <div class="detail-row">
+                            <span style="margin-right: 8px;">Booking Finalized By:</span>
+                            <div class="form-line"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Function to populate the form with borrowing data
+        function populateForm(borrowingData) {
+            // Format date
+            const formatDate = (dateString) => {
+                const date = new Date(dateString);
+                return date.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric' 
+                });
+            };
+
+            // Format time
+            const formatTime = (timeString) => {
+                return timeString;
+            };
+
+            // Populate both copies of the form
+            for (let copy = 1; copy <= 2; copy++) {
+                // Borrower info
+                document.getElementById(`borrower-name-${copy}`).textContent = borrowingData.borrowerName;
+                document.getElementById(`department-${copy}`).textContent = borrowingData.department;
+                
+                // Items and serial numbers
+                const borrowedItemsContainer = document.getElementById(`borrowed-items-${copy}`);
+                const serialNumbersContainer = document.getElementById(`serial-numbers-${copy}`);
+                
+                borrowedItemsContainer.innerHTML = '';
+                serialNumbersContainer.innerHTML = '';
+                
+                borrowingData.items.forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'borrowed-item form-line';
+                    itemDiv.textContent = item.name;
+                    borrowedItemsContainer.appendChild(itemDiv);
+                    
+                    const serialDiv = document.createElement('div');
+                    serialDiv.className = 'serial-number form-line';
+                    serialDiv.textContent = item.serialNumber || '-';
+                    serialNumbersContainer.appendChild(serialDiv);
+                });
+                
+                // Details
+                document.getElementById(`purpose-${copy}`).textContent = 'Event/Activity';
+                document.getElementById(`date-of-use-${copy}`).textContent = formatDate(borrowingData.date);
+                document.getElementById(`time-of-use-${copy}`).textContent = `${formatTime(borrowingData.startTime)} - ${formatTime(borrowingData.endTime)}`;
+                document.getElementById(`room-location-${copy}`).textContent = borrowingData.roomLocation;
+                document.getElementById(`due-date-time-${copy}`).textContent = `${formatDate(borrowingData.date)} ${formatTime(borrowingData.endTime)}`;
+                
+                // Received by
+                document.getElementById(`received-by-${copy}`).textContent = borrowingData.receivedBy || '';
+            }
+        }
+
+        // Function to print the form
+        function printForm() {
+            window.print();
+        }
+
+        // Check if data is passed via URL parameters
+        window.addEventListener('load', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const borrowingData = urlParams.get('data');
+            
+            if (borrowingData) {
+                try {
+                    const parsedData = JSON.parse(decodeURIComponent(borrowingData));
+                    populateForm(parsedData);
+                } catch (error) {
+                    console.error('Error parsing borrowing data:', error);
+                }
+            }
+        });
+    </script>
+
+</body>
+</html>

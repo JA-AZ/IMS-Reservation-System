@@ -6,7 +6,9 @@ import { ProtectedRoute } from '../context/AuthContext';
 import { getItemBorrowings, deleteItemBorrowing } from '../firebase/services';
 import { ItemBorrowing, ItemBorrowingStatus } from '../types';
 import Link from 'next/link';
-import { FiPlus, FiEdit, FiTrash2, FiEye, FiClipboard, FiFilter, FiSearch } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiEye, FiClipboard, FiFilter, FiSearch, FiPrinter } from 'react-icons/fi';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 export default function ItemBorrowingsPage() {
   const [borrowings, setBorrowings] = useState<ItemBorrowing[]>([]);
@@ -133,6 +135,344 @@ export default function ItemBorrowingsPage() {
   const handleCloseModal = () => {
     setShowModal(false);
     setSelectedBorrowing(null);
+  };
+
+  const handlePrintForm = async (borrowing: ItemBorrowing) => {
+    // Prepare the data for the form
+    const formData = {
+      borrowerName: borrowing.borrowerName,
+      department: borrowing.department,
+      items: borrowing.items,
+      date: borrowing.date,
+      startTime: borrowing.startTime,
+      endTime: borrowing.endTime,
+      roomLocation: borrowing.roomLocation,
+      receivedBy: borrowing.receivedBy
+    };
+
+    // Create a temporary div to render the form
+    const tempDiv = document.createElement('div');
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.left = '-9999px';
+    tempDiv.style.top = '-9999px';
+    tempDiv.style.width = '2448px'; // Higher resolution for sharper output
+    tempDiv.style.height = '3744px'; // Higher resolution for sharper output
+    tempDiv.style.background = 'transparent';
+    tempDiv.style.padding = '0';
+    tempDiv.style.margin = '0';
+    tempDiv.style.fontFamily = 'Inter, sans-serif, Arial';
+    tempDiv.style.fontSize = '33px'; // Scaled up font size for higher resolution
+    tempDiv.style.lineHeight = '1.2';
+    tempDiv.style.color = 'black';
+    tempDiv.style.border = 'none';
+    tempDiv.style.outline = 'none';
+    tempDiv.style.overflow = 'hidden';
+    tempDiv.style.boxSizing = 'border-box';
+
+    // Create the HTML content with embedded data and local logo
+    const htmlContent = `
+      <div style="width: 2448px; height: 3744px; background: transparent; padding: 144px; margin: 0; font-family: 'Inter', sans-serif, Arial; font-size: 33px; line-height: 1.2; color: black; border: none; outline: none; overflow: hidden; box-sizing: border-box;">
+          <!-- First Copy of the Form -->
+          <div style="border: 6px solid black; padding: 36px; height: 48%; display: flex; flex-direction: column; margin-bottom: 24px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 18px; border-bottom: 6px solid black; margin-bottom: 24px;">
+                  <div>
+                      <img src="/UC LOGO.jpg" alt="University of Cebu Logo" style="height: 120px; width: auto;">
+                  </div>
+                  <div style="font-size: 42px; font-weight: bold; text-align: center;">
+                      INSTRUCTIONAL MEDIA SERVICES (IMS)
+                  </div>
+                  <div style="font-size: 48px; font-weight: bold; text-align: right;">
+                      BORROWER'S FORM
+                  </div>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; font-size: 33px;">
+                  <div style="width: 48%;">
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="margin-right: 24px;">Borrower's Name:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; font-size: 33px; flex-grow: 1;">${formData.borrowerName}</div>
+                      </div>
+                  </div>
+                  <div style="width: 48%;">
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="margin-right: 24px;">Department:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; font-size: 33px; flex-grow: 1;">${formData.department}</div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px; margin-top: 12px;">
+                          <span style="margin-right: 24px;">Teacher's Name and Signature:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                      </div>
+                  </div>
+              </div>
+
+              <div style="border: 6px solid black; padding: 24px; flex-grow: 1; margin-bottom: 24px;">
+                  <div style="display: flex; height: 100%;">
+                      <div style="width: 50%; padding-right: 24px; border-right: 3px solid black;">
+                          <div style="font-size: 30px; font-weight: bold; text-align: center; margin-bottom: 24px;">BORROWED MATERIALS/ITEMS</div>
+                          <div>
+                              ${formData.items.map(item => `<div style="font-size: 27px; line-height: 1.3; margin-bottom: 6px; border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px;">${item.name}</div>`).join('')}
+                          </div>
+                      </div>
+                      <div style="width: 50%; padding-left: 24px;">
+                          <div style="font-size: 30px; font-weight: bold; text-align: center; margin-bottom: 24px;">DESCRIPTION/TITLE/SERIAL No.</div>
+                          <div>
+                              ${formData.items.map(item => `<div style="font-size: 27px; line-height: 1.3; margin-bottom: 6px; border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px;">${item.serialNumber || '-'}</div>`).join('')}
+                          </div>
+                      </div>
+                  </div>
+              </div>
+              
+              <div style="display: flex; margin-bottom: 24px; font-size: 30px;">
+                  <div style="width: 50%; padding-right: 24px;">
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">PURPOSE:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; font-size: 33px; flex-grow: 1;">Event/Activity</div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">DATE OF USE:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; font-size: 33px; flex-grow: 1;">${new Date(formData.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">TIME OF USE:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; font-size: 33px; flex-grow: 1;">${formData.startTime} - ${formData.endTime}</div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">PLACE OR ROOM NO:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; font-size: 33px; flex-grow: 1;">${formData.roomLocation}</div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">DUE DATE & TIME:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; font-size: 33px; flex-grow: 1;">${new Date(formData.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} ${formData.endTime}</div>
+                      </div>
+                  </div>
+                  <div style="width: 50%; border: 6px solid black; padding: 24px;">
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">DATE RECEIVED:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">RECEIVED BY:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">I.D. NUMBER:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">SIGNATURE:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">RELEASED BY:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                      </div>
+                  </div>
+              </div>
+              
+              <div style="margin-top: auto; padding-top: 18px; font-size: 30px;">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 18px;">
+                      <div style="width: 48%;">
+                          <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                              <span style="margin-right: 24px;">Approved By:</span>
+                              <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                          </div>
+                          <div style="font-size: 24px; font-weight: bold; text-align: center; margin-top: 6px;">IMS DIRECTOR</div>
+                      </div>
+                      <div style="width: 48%;">
+                          <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                              <span style="margin-right: 24px;">DATE & TIME RETURNED:</span>
+                              <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                          </div>
+                          <div style="text-align: right; margin-top: 12px; font-size: 27px; display: flex; align-items: center; justify-content: flex-end;">
+                              RETURNED IN GOOD CONDITION: YES <span style="width: 36px; height: 36px; border: 3px solid black; display: inline-block; margin-left: 12px; margin-right: 24px;"></span> NO <span style="width: 36px; height: 36px; border: 3px solid black; display: inline-block; margin-left: 12px;"></span>
+                          </div>
+                      </div>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 18px;">
+                      <div style="width: 48%;">
+                          <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                              <span style="margin-right: 24px;">Booking Received By:</span>
+                              <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; font-size: 33px; flex-grow: 1;">${formData.receivedBy || ''}</div>
+                          </div>
+                      </div>
+                      <div style="width: 48%;">
+                          <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                              <span style="margin-right: 24px;">Booking Finalized By:</span>
+                              <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+
+          <!-- Second Copy of the Form -->
+          <div style="border: 6px solid black; padding: 36px; height: 48%; display: flex; flex-direction: column; margin-bottom: 24px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 18px; border-bottom: 6px solid black; margin-bottom: 24px;">
+                  <div>
+                      <img src="/UC LOGO.jpg" alt="University of Cebu Logo" style="height: 120px; width: auto;">
+                  </div>
+                  <div style="font-size: 42px; font-weight: bold; text-align: center;">
+                      INSTRUCTIONAL MEDIA SERVICES (IMS)
+                  </div>
+                  <div style="font-size: 48px; font-weight: bold; text-align: right;">
+                      BORROWER'S FORM
+                  </div>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; font-size: 33px;">
+                  <div style="width: 48%;">
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="margin-right: 24px;">Borrower's Name:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; font-size: 33px; flex-grow: 1;">${formData.borrowerName}</div>
+                      </div>
+                  </div>
+                  <div style="width: 48%;">
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="margin-right: 24px;">Department:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; font-size: 33px; flex-grow: 1;">${formData.department}</div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px; margin-top: 12px;">
+                          <span style="margin-right: 24px;">Teacher's Name and Signature:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                      </div>
+                  </div>
+              </div>
+
+              <div style="border: 6px solid black; padding: 24px; flex-grow: 1; margin-bottom: 24px;">
+                  <div style="display: flex; height: 100%;">
+                      <div style="width: 50%; padding-right: 24px; border-right: 3px solid black;">
+                          <div style="font-size: 30px; font-weight: bold; text-align: center; margin-bottom: 24px;">BORROWED MATERIALS/ITEMS</div>
+                          <div>
+                              ${formData.items.map(item => `<div style="font-size: 27px; line-height: 1.3; margin-bottom: 6px; border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px;">${item.name}</div>`).join('')}
+                          </div>
+                      </div>
+                      <div style="width: 50%; padding-left: 24px;">
+                          <div style="font-size: 30px; font-weight: bold; text-align: center; margin-bottom: 24px;">DESCRIPTION/TITLE/SERIAL No.</div>
+                          <div>
+                              ${formData.items.map(item => `<div style="font-size: 27px; line-height: 1.3; margin-bottom: 6px; border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px;">${item.serialNumber || '-'}</div>`).join('')}
+                          </div>
+                      </div>
+                  </div>
+              </div>
+              
+              <div style="display: flex; margin-bottom: 24px; font-size: 30px;">
+                  <div style="width: 50%; padding-right: 24px;">
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">PURPOSE:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; font-size: 33px; flex-grow: 1;">Event/Activity</div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">DATE OF USE:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; font-size: 33px; flex-grow: 1;">${new Date(formData.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">TIME OF USE:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; font-size: 33px; flex-grow: 1;">${formData.startTime} - ${formData.endTime}</div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">PLACE OR ROOM NO:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; font-size: 33px; flex-grow: 1;">${formData.roomLocation}</div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">DUE DATE & TIME:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; font-size: 33px; flex-grow: 1;">${new Date(formData.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} ${formData.endTime}</div>
+                      </div>
+                  </div>
+                  <div style="width: 50%; border: 6px solid black; padding: 24px;">
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">DATE RECEIVED:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">RECEIVED BY:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">I.D. NUMBER:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">SIGNATURE:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                      </div>
+                      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                          <span style="width: 240px; font-weight: bold;">RELEASED BY:</span>
+                          <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                      </div>
+                  </div>
+              </div>
+              
+              <div style="margin-top: auto; padding-top: 18px; font-size: 30px;">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 18px;">
+                      <div style="width: 48%;">
+                          <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                              <span style="margin-right: 24px;">Approved By:</span>
+                              <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                          </div>
+                          <div style="font-size: 24px; font-weight: bold; text-align: center; margin-top: 6px;">IMS DIRECTOR</div>
+                      </div>
+                      <div style="width: 48%;">
+                          <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                              <span style="margin-right: 24px;">DATE & TIME RETURNED:</span>
+                              <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                          </div>
+                          <div style="text-align: right; margin-top: 12px; font-size: 27px; display: flex; align-items: center; justify-content: flex-end;">
+                              RETURNED IN GOOD CONDITION: YES <span style="width: 36px; height: 36px; border: 3px solid black; display: inline-block; margin-left: 12px; margin-right: 24px;"></span> NO <span style="width: 36px; height: 36px; border: 3px solid black; display: inline-block; margin-left: 12px;"></span>
+                          </div>
+                      </div>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 18px;">
+                      <div style="width: 48%;">
+                          <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                              <span style="margin-right: 24px;">Booking Received By:</span>
+                              <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; font-size: 33px; flex-grow: 1;">${formData.receivedBy || ''}</div>
+                          </div>
+                      </div>
+                      <div style="width: 48%;">
+                          <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                              <span style="margin-right: 24px;">Booking Finalized By:</span>
+                              <div style="border-bottom: 3px solid black; padding-bottom: 12px; min-height: 48px; flex-grow: 1;"></div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+    `;
+
+    tempDiv.innerHTML = htmlContent;
+    document.body.appendChild(tempDiv);
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for logo to load
+
+      const canvas = await html2canvas(tempDiv, {
+        useCORS: true,
+        allowTaint: true,
+        background: 'transparent',
+        width: 2448, // 8.5 inches * 288 DPI (3x higher resolution)
+        height: 3744, // 13 inches * 288 DPI (3x higher resolution)
+        logging: false
+      });
+
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'in',
+        format: [8.5, 13]
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData, 'PNG', 0, 0, 8.5, 13);
+
+      const fileName = `${formData.department}_${new Date(formData.date).toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error generating PDF. Please try again.');
+    } finally {
+      document.body.removeChild(tempDiv);
+    }
   };
   
   const getStatusColor = (status: ItemBorrowingStatus) => {
@@ -360,6 +700,13 @@ export default function ItemBorrowingsPage() {
                             >
                               <FiEye size={16} />
                             </button>
+                            <button
+                              onClick={() => handlePrintForm(borrowing)}
+                              className="text-purple-600 hover:text-purple-900 p-1 rounded hover:bg-purple-50"
+                              title="Print Form"
+                            >
+                              <FiPrinter size={16} />
+                            </button>
                             <Link
                               href={`/item-borrowings/edit/${borrowing.id}`}
                               className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50"
@@ -467,6 +814,13 @@ export default function ItemBorrowingsPage() {
               </div>
 
               <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => handlePrintForm(selectedBorrowing)}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-purple-700 bg-white hover:bg-purple-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                >
+                  <FiPrinter className="mr-2" size={16} />
+                  Print Form
+                </button>
                 <Link
                   href={`/item-borrowings/edit/${selectedBorrowing.id}`}
                   className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"

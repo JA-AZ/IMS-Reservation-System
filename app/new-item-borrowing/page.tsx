@@ -7,7 +7,7 @@ import { ProtectedRoute } from '../context/AuthContext';
 import { getItems, addItemBorrowing, getItemBorrowingsByDate } from '../firebase/services';
 import { Item, ItemBorrowingStatus } from '../types';
 import Link from 'next/link';
-import { FiArrowLeft, FiSave, FiPackage } from 'react-icons/fi';
+import { FiArrowLeft, FiSave, FiPackage, FiSearch, FiFilter } from 'react-icons/fi';
 
 export default function NewItemBorrowingPage() {
   const router = useRouter();
@@ -32,6 +32,11 @@ export default function NewItemBorrowingPage() {
   const [availableItems, setAvailableItems] = useState<Item[]>([]);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   
+  // Search and filter state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [filteredItems, setFilteredItems] = useState<Item[]>([]);
+  
   useEffect(() => {
     fetchItems();
   }, []);
@@ -41,6 +46,27 @@ export default function NewItemBorrowingPage() {
       checkItemAvailability();
     }
   }, [date, startTime, endTime]);
+  
+  // Filter items based on search term and category
+  useEffect(() => {
+    let filtered = availableItems;
+    
+    // Apply search filter
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(item => 
+        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.serialNumber.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Apply category filter
+    if (selectedCategory) {
+      filtered = filtered.filter(item => item.category === selectedCategory);
+    }
+    
+    setFilteredItems(filtered);
+  }, [availableItems, searchTerm, selectedCategory]);
   
   const fetchItems = async () => {
     try {
@@ -149,6 +175,21 @@ export default function NewItemBorrowingPage() {
     } finally {
       setLoading(false);
     }
+  };
+  
+  // Get unique categories from available items
+  const getUniqueCategories = () => {
+    const categories = availableItems
+      .map(item => item.category)
+      .filter((category, index, self) => category && self.indexOf(category) === index)
+      .sort();
+    return categories;
+  };
+  
+  // Clear search and filters
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedCategory('');
   };
   
   return (
@@ -356,6 +397,7 @@ export default function NewItemBorrowingPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-3">
                     Select Items to Borrow *
                   </label>
+                  
                   {checkingAvailability ? (
                     <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -373,27 +415,102 @@ export default function NewItemBorrowingPage() {
                       </p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-64 overflow-y-auto border border-gray-300 rounded-lg p-4">
-                      {availableItems.map((item) => (
-                        <label key={item.id} className="flex items-start space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                          <input
-                            type="checkbox"
-                            checked={selectedItemIds.includes(item.id)}
-                            onChange={(e) => handleItemSelection(item.id, e.target.checked)}
-                            className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900">{item.name}</p>
-                            <p className="text-sm text-gray-500">{item.description}</p>
-                            <p className="text-xs text-gray-400">SN: {item.serialNumber}</p>
-                            {item.category && (
-                              <p className="text-xs text-gray-400">Category: {item.category}</p>
-                            )}
+                    <>
+                      {/* Search and Filter Controls */}
+                      <div className="mb-4 space-y-3">
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          {/* Search Input */}
+                          <div className="flex-1 relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <FiSearch className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <input
+                              type="text"
+                              placeholder="Search items by name, description, or serial number..."
+                              value={searchTerm}
+                              onChange={(e) => setSearchTerm(e.target.value)}
+                              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            />
                           </div>
-                        </label>
-                      ))}
-                    </div>
+                          
+                          {/* Category Filter */}
+                          <div className="sm:w-48">
+                            <select
+                              value={selectedCategory}
+                              onChange={(e) => setSelectedCategory(e.target.value)}
+                              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            >
+                              <option value="">All Categories</option>
+                              {getUniqueCategories().map((category) => (
+                                <option key={category} value={category}>
+                                  {category}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          
+                          {/* Clear Filters Button */}
+                          {(searchTerm || selectedCategory) && (
+                            <button
+                              type="button"
+                              onClick={clearFilters}
+                              className="px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            >
+                              Clear Filters
+                            </button>
+                          )}
+                        </div>
+                        
+                        {/* Results Summary */}
+                        <div className="flex items-center justify-between text-sm text-gray-600">
+                          <span>
+                            Showing {filteredItems.length} of {availableItems.length} available items
+                          </span>
+                          {(searchTerm || selectedCategory) && (
+                            <span className="text-blue-600">
+                              Filtered results
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Items Grid */}
+                      {filteredItems.length === 0 ? (
+                        <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                          <FiPackage className="mx-auto h-8 w-8 text-gray-400" />
+                          <h3 className="mt-2 text-sm font-medium text-gray-900">No items found</h3>
+                          <p className="mt-1 text-sm text-gray-500">
+                            {searchTerm || selectedCategory 
+                              ? 'Try adjusting your search terms or category filter.'
+                              : 'No items are currently available.'
+                            }
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-64 overflow-y-auto border border-gray-300 rounded-lg p-4">
+                          {filteredItems.map((item) => (
+                            <label key={item.id} className="flex items-start space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                              <input
+                                type="checkbox"
+                                checked={selectedItemIds.includes(item.id)}
+                                onChange={(e) => handleItemSelection(item.id, e.target.checked)}
+                                className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                                <p className="text-sm text-gray-500">{item.description}</p>
+                                <p className="text-xs text-gray-400">SN: {item.serialNumber}</p>
+                                {item.category && (
+                                  <p className="text-xs text-gray-400">Category: {item.category}</p>
+                                )}
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
+                  
                   {selectedItemIds.length > 0 && (
                     <p className="mt-2 text-sm text-gray-600">
                       Selected {selectedItemIds.length} item(s)
