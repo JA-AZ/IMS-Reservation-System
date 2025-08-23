@@ -45,6 +45,9 @@ export default function VenueBookingsCalendar() {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const currentHoverDateRef = useRef<string | null>(null);
   
+  // Venue filtering state
+  const [selectedVenueFilter, setSelectedVenueFilter] = useState<string | null>(null);
+  
   const [currentDate, setCurrentDate] = useState(() => {
     // Always initialize with the 1st day of the current month
     const now = new Date();
@@ -204,9 +207,16 @@ export default function VenueBookingsCalendar() {
 
   const getReservationsForDate = (dateStr: string | null) => {
     if (!dateStr) return [];
-    return allReservations.filter(res => 
+    let reservations = allReservations.filter(res => 
       dateStr >= res.startDate && dateStr <= res.endDate && res.status !== 'Cancelled'
     );
+    
+    // Apply venue filter if selected
+    if (selectedVenueFilter) {
+      reservations = reservations.filter(res => res.venueName === selectedVenueFilter);
+    }
+    
+    return reservations;
   };
 
   const formatDate = (dateString: string) => {
@@ -244,6 +254,17 @@ export default function VenueBookingsCalendar() {
   const handleEditReservation = (reservationId: string) => {
     // Navigate to edit page in the same tab
     window.location.href = `/reservations/edit/${reservationId}`;
+  };
+
+  // Handle venue legend click
+  const handleVenueLegendClick = (venueName: string) => {
+    if (selectedVenueFilter === venueName) {
+      // If clicking the same venue, clear the filter (show all)
+      setSelectedVenueFilter(null);
+    } else {
+      // Set the new venue filter
+      setSelectedVenueFilter(venueName);
+    }
   };
 
   // Calculate tooltip height dynamically based on content
@@ -362,21 +383,60 @@ export default function VenueBookingsCalendar() {
         </div>
       </div>
       
+      {/* Venue Legend with Filtering */}
       <div className="mb-6 bg-gray-50 p-4 rounded-lg overflow-x-auto">
         <div className="flex flex-wrap gap-3">
           {venues.map((venue) => (
-            <div 
-              key={venue.id} 
-              className="flex items-center bg-white px-3 py-1.5 rounded-full shadow-sm border border-gray-200 whitespace-nowrap"
+            <button
+              key={venue.id}
+              onClick={() => handleVenueLegendClick(venue.name)}
+              className={`flex items-center px-3 py-1.5 rounded-full shadow-sm border transition-all duration-200 whitespace-nowrap cursor-pointer ${
+                selectedVenueFilter === venue.name
+                  ? 'bg-blue-100 border-blue-300 text-blue-800 shadow-md transform scale-105'
+                  : 'bg-white border-gray-200 text-gray-900 hover:bg-gray-50 hover:border-gray-300'
+              }`}
+              title={selectedVenueFilter === venue.name 
+                ? `Click to show all venues` 
+                : `Click to show only ${venue.name} reservations`
+              }
             >
               <div 
                 className="w-3 h-3 rounded-full mr-2 flex-shrink-0" 
                 style={{ backgroundColor: venueColors[venue.name] }}
               />
-              <span className="text-gray-900 font-medium">{venue.name}</span>
-            </div>
+              <span className="font-medium">{venue.name}</span>
+              {selectedVenueFilter === venue.name && (
+                <span className="ml-2 text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full">
+                  Active
+                </span>
+              )}
+            </button>
           ))}
+          
+          {/* Clear Filter Button */}
+          {selectedVenueFilter && (
+            <button
+              onClick={() => setSelectedVenueFilter(null)}
+              className="flex items-center px-3 py-1.5 rounded-full bg-gray-200 border-gray-300 text-gray-700 hover:bg-gray-300 transition-all duration-200"
+              title="Clear venue filter"
+            >
+              <span className="font-medium">Show All Venues</span>
+            </button>
+          )}
         </div>
+        
+        {/* Filter Status */}
+        {selectedVenueFilter && (
+          <div className="mt-3 text-sm text-gray-600">
+            <span className="font-medium">Filtered by:</span> {selectedVenueFilter} • 
+            <button
+              onClick={() => setSelectedVenueFilter(null)}
+              className="ml-2 text-blue-600 hover:text-blue-800 underline"
+            >
+              Clear filter
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="w-full">
@@ -500,7 +560,12 @@ export default function VenueBookingsCalendar() {
               ))}
             </div>
           ) : (
-            <div className="text-gray-500 italic text-xs">No reservations for this date</div>
+            <div className="text-gray-500 italic text-xs">
+              {selectedVenueFilter 
+                ? `No ${selectedVenueFilter} reservations for this date`
+                : 'No reservations for this date'
+              }
+            </div>
           )}
         </div>
       )}
@@ -512,6 +577,11 @@ export default function VenueBookingsCalendar() {
             <div className="p-4 md:p-6">
               <h3 className="text-2xl font-bold text-gray-900 mb-6">
                 Reservations for {formatDate(selectedDate)}
+                {selectedVenueFilter && (
+                  <span className="text-lg font-normal text-gray-600 ml-2">
+                    • {selectedVenueFilter} only
+                  </span>
+                )}
               </h3>
               
               <div className="space-y-4">
