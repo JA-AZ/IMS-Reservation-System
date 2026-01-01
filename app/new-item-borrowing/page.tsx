@@ -233,7 +233,7 @@ export default function NewItemBorrowingPage() {
           
           // Check if borrowing date is in selected dates
           const borrowingDate = borrowing.date || borrowing.startDate;
-          if (!selectedDates.includes(borrowingDate)) return false;
+          if (!borrowingDate || !selectedDates.includes(borrowingDate)) return false;
           
           // Check for time overlap
           return hasTimeOverlap(borrowing.startTime, borrowing.endTime, startTime, endTime);
