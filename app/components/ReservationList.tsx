@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { format, parse, startOfMonth, endOfMonth } from 'date-fns';
-import { FiEdit, FiTrash2, FiFilter, FiChevronLeft, FiChevronRight, FiEye, FiClock, FiMapPin, FiUser, FiMail, FiFileText, FiCalendar } from 'react-icons/fi';
+import { format } from 'date-fns';
+import { FiEdit, FiTrash2, FiFilter, FiChevronLeft, FiChevronRight, FiChevronDown, FiChevronUp, FiEye, FiClock, FiMapPin, FiUser, FiMail, FiFileText, FiCalendar } from 'react-icons/fi';
 import Link from 'next/link';
 import { getReservations, getVenues, deleteReservation } from '../firebase/services';
 import { Reservation, VenueType } from '../types';
@@ -20,17 +20,34 @@ export default function ReservationList() {
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   
   // Filtering state
-  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [dateRangeStart, setDateRangeStart] = useState<string>('');
+  const [dateRangeEnd, setDateRangeEnd] = useState<string>('');
   const [selectedVenue, setSelectedVenue] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const rowsPerPage = 10;
+
+  // Helper function to get timestamp value for sorting
+  const getTimestamp = (createdAt: any): number => {
+    if (!createdAt) return 0;
+    if (createdAt.toDate) {
+      return createdAt.toDate().getTime();
+    }
+    if (createdAt instanceof Date) {
+      return createdAt.getTime();
+    }
+    if (typeof createdAt === 'string') {
+      return new Date(createdAt).getTime();
+    }
+    return 0;
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -39,10 +56,18 @@ export default function ReservationList() {
           getReservations(),
           getVenues()
         ]);
-        setAllReservations(reservationsData);
-        setReservations(reservationsData);
+        
+        // Sort by createdAt descending (most recent first)
+        const sortedReservations = [...reservationsData].sort((a, b) => {
+          const timeA = getTimestamp(a.createdAt);
+          const timeB = getTimestamp(b.createdAt);
+          return timeB - timeA; // Descending order (newest first)
+        });
+        
+        setAllReservations(sortedReservations);
+        setReservations(sortedReservations);
         setVenues(venuesData);
-        setTotalPages(Math.ceil(reservationsData.length / rowsPerPage));
+        setTotalPages(Math.ceil(sortedReservations.length / rowsPerPage));
       } catch (error) {
         console.error('Error fetching data:', error);
         setError('Failed to load reservations');
@@ -78,22 +103,50 @@ export default function ReservationList() {
       filtered = filtered.filter(res => res.venueId === selectedVenue);
     }
     
-    // Filter by month
-    if (selectedMonth) {
-      const [year, month] = selectedMonth.split('-');
-      const startDate = startOfMonth(new Date(parseInt(year), parseInt(month) - 1));
-      const endDate = endOfMonth(new Date(parseInt(year), parseInt(month) - 1));
-      
+    // Filter by date range
+    if (dateRangeStart || dateRangeEnd) {
       filtered = filtered.filter(res => {
         const resStartDate = new Date(res.startDate);
         const resEndDate = new Date(res.endDate);
         
-        // Check if any part of the reservation falls within the selected month
-        return (
-          (resStartDate >= startDate && resStartDate <= endDate) || 
-          (resEndDate >= startDate && resEndDate <= endDate) ||
-          (resStartDate <= startDate && resEndDate >= endDate)
-        );
+        // Normalize dates to start of day for comparison
+        resStartDate.setHours(0, 0, 0, 0);
+        resEndDate.setHours(23, 59, 59, 999);
+        
+        let matchesStart = true;
+        let matchesEnd = true;
+        
+        if (dateRangeStart) {
+          const filterStart = new Date(dateRangeStart);
+          filterStart.setHours(0, 0, 0, 0);
+          // Reservation overlaps if it starts before or on the filter end, and ends after or on the filter start
+          matchesStart = resEndDate >= filterStart;
+        }
+        
+        if (dateRangeEnd) {
+          const filterEnd = new Date(dateRangeEnd);
+          filterEnd.setHours(23, 59, 59, 999);
+          // Reservation overlaps if it starts before or on the filter end, and ends after or on the filter start
+          matchesEnd = resStartDate <= filterEnd;
+        }
+        
+        // If only one date is selected, check if reservation falls on that date
+        if (dateRangeStart && !dateRangeEnd) {
+          const filterStart = new Date(dateRangeStart);
+          filterStart.setHours(0, 0, 0, 0);
+          const filterEnd = new Date(dateRangeStart);
+          filterEnd.setHours(23, 59, 59, 999);
+          return (resStartDate <= filterEnd && resEndDate >= filterStart);
+        }
+        
+        if (!dateRangeStart && dateRangeEnd) {
+          const filterEnd = new Date(dateRangeEnd);
+          filterEnd.setHours(23, 59, 59, 999);
+          return resStartDate <= filterEnd;
+        }
+        
+        // Both dates selected - check if reservation overlaps with the range
+        return matchesStart && matchesEnd;
       });
     }
     
@@ -109,10 +162,17 @@ export default function ReservationList() {
       );
     }
     
+    // Sort by createdAt descending (most recent first)
+    filtered.sort((a, b) => {
+      const timeA = getTimestamp(a.createdAt);
+      const timeB = getTimestamp(b.createdAt);
+      return timeB - timeA; // Descending order (newest first)
+    });
+    
     setReservations(filtered);
     setTotalPages(Math.ceil(filtered.length / rowsPerPage));
     setCurrentPage(1); // Reset to first page when filters change
-  }, [selectedMonth, selectedVenue, selectedStatus, allReservations, debouncedSearchTerm]);
+  }, [dateRangeStart, dateRangeEnd, selectedVenue, selectedStatus, allReservations, debouncedSearchTerm]);
 
   const handleDelete = async () => {
     if (!reservationToDelete) return;
@@ -165,22 +225,40 @@ export default function ReservationList() {
     return reservations.slice(startIndex, endIndex);
   };
   
-  // Get available months from reservations
-  const getAvailableMonths = () => {
-    const months = new Set<string>();
+  // Get min and max dates from reservations for date picker limits
+  const getDateRange = () => {
+    if (allReservations.length === 0) {
+      return { min: '', max: '' };
+    }
     
-    allReservations.forEach(res => {
-      // Add start date month
-      const startDate = new Date(res.startDate);
-      months.add(`${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`);
-      
-      // Add end date month if different
-      const endDate = new Date(res.endDate);
-      months.add(`${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}`);
-    });
+    const dates = allReservations.flatMap(res => [
+      new Date(res.startDate),
+      new Date(res.endDate)
+    ]);
     
-    return Array.from(months).sort();
+    const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+    
+    return {
+      min: format(minDate, 'yyyy-MM-dd'),
+      max: format(maxDate, 'yyyy-MM-dd')
+    };
   };
+
+  const dateRange = getDateRange();
+
+  const handleClearDateRange = () => {
+    setDateRangeStart('');
+    setDateRangeEnd('');
+  };
+
+  const handleTodayRange = () => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    setDateRangeStart(today);
+    setDateRangeEnd(today);
+  };
+
+  const hasActiveDateRange = Boolean(dateRangeStart || dateRangeEnd);
 
   const formatTime = (timeString: string): string => {
     if (!timeString) return '';
@@ -241,32 +319,96 @@ export default function ReservationList() {
             </button>
           )}
         </div>
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
+        
+        {/* Mobile: Toggle Filters Button */}
+        <button
+          type="button"
+          onClick={() => setFiltersExpanded(!filtersExpanded)}
+          className="md:hidden w-full flex items-center justify-between text-sm font-medium text-gray-700 mb-4 p-2 -mx-2 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <span className="flex items-center">
+            <FiFilter className="mr-2" size={16} />
+            Filters
+            {(dateRangeStart || dateRangeEnd || selectedVenue || selectedStatus) && (
+              <span className="ml-2 text-xs text-blue-600 font-normal">
+                (Active)
+              </span>
+            )}
+          </span>
+          {filtersExpanded ? (
+            <FiChevronUp className="text-gray-500" size={16} />
+          ) : (
+            <FiChevronDown className="text-gray-500" size={16} />
+          )}
+        </button>
+        
+        {/* Filters Section - Hidden on mobile by default, visible on desktop */}
+        <div className={`md:block ${filtersExpanded ? 'block' : 'hidden'}`}>
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              <FiFilter className="inline mr-1" /> Filter by Month
+              <FiCalendar className="inline mr-2" size={16} /> Filter by Date Range
             </label>
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-            >
-              <option value="">All Months</option>
-              {getAvailableMonths().map(month => {
-                const [year, monthNum] = month.split('-');
-                const monthName = format(new Date(parseInt(year), parseInt(monthNum) - 1), 'MMMM yyyy');
-                return (
-                  <option key={month} value={month}>
-                    {monthName}
-                  </option>
-                );
-              })}
-            </select>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={handleTodayRange}
+                className="px-3 py-2 text-sm rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-nowrap"
+              >
+                Today
+              </button>
+              <div className="flex-1">
+                <input
+                  type="date"
+                  value={dateRangeStart}
+                  onChange={(e) => setDateRangeStart(e.target.value)}
+                  min={dateRange.min}
+                  max={dateRangeEnd || dateRange.max}
+                  className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm"
+                  placeholder="Start date"
+                />
+              </div>
+              <div className="flex items-center justify-center text-gray-500 text-sm py-2 sm:py-0">
+                to
+              </div>
+              <div className="flex-1">
+                <input
+                  type="date"
+                  value={dateRangeEnd}
+                  onChange={(e) => setDateRangeEnd(e.target.value)}
+                  min={dateRangeStart || dateRange.min}
+                  max={dateRange.max}
+                  className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm"
+                  placeholder="End date"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleClearDateRange}
+                disabled={!hasActiveDateRange}
+                className={`px-3 py-2 text-sm rounded-md border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  hasActiveDateRange
+                    ? 'text-gray-600 hover:text-gray-800 border-gray-300 hover:bg-gray-50 bg-white'
+                    : 'text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed'
+                }`}
+              >
+                Clear
+              </button>
+            </div>
+            {(dateRangeStart || dateRangeEnd) && (
+              <p className="mt-1 text-xs text-gray-500">
+                {dateRangeStart && dateRangeEnd
+                  ? `Showing reservations from ${format(new Date(dateRangeStart), 'MMM d, yyyy')} to ${format(new Date(dateRangeEnd), 'MMM d, yyyy')}`
+                  : dateRangeStart
+                  ? `Showing reservations from ${format(new Date(dateRangeStart), 'MMM d, yyyy')} onwards`
+                  : `Showing reservations up to ${format(new Date(dateRangeEnd), 'MMM d, yyyy')}`}
+              </p>
+            )}
           </div>
           
           <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              <FiFilter className="inline mr-1" /> Filter by Venue
+              <FiFilter className="inline mr-2" size={16} /> Filter by Venue
             </label>
             <select
               value={selectedVenue}
@@ -284,7 +426,7 @@ export default function ReservationList() {
           
           <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              <FiFilter className="inline mr-1" /> Filter by Status
+              <FiFilter className="inline mr-2" size={16} /> Filter by Status
             </label>
             <select
               value={selectedStatus}
@@ -297,6 +439,7 @@ export default function ReservationList() {
               <option value="Confirmed">Confirmed</option>
               <option value="Cancelled">Cancelled</option>
             </select>
+          </div>
           </div>
         </div>
       </div>

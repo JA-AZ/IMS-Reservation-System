@@ -59,7 +59,10 @@ export type ItemBorrowing = {
   department: string;
   itemIds: string[];
   items: Item[]; // Populated items for display
-  date: string;
+  date: string; // Legacy field - kept for backward compatibility. Use startDate/endDate for new entries.
+  startDate?: string; // Start date of borrowing (for date range or scattered dates)
+  endDate?: string; // End date of borrowing (for date range or scattered dates)
+  selectedDates?: string[]; // Array of selected dates for scattered date bookings
   startTime: string;
   endTime: string;
   roomLocation: string;

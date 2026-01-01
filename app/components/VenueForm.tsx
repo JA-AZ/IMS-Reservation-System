@@ -4,7 +4,12 @@ import { useState } from 'react';
 import { FiMapPin, FiUsers, FiInfo } from 'react-icons/fi';
 import { addVenue } from '../firebase/services';
 
-export default function VenueForm() {
+type VenueFormProps = {
+  showTitle?: boolean;
+};
+
+export default function VenueForm({ showTitle = true }: VenueFormProps) {
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -66,7 +71,9 @@ export default function VenueForm() {
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-bold text-gray-900 mb-4">Add New Venue</h2>
+      {showTitle && (
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Add New Venue</h2>
+      )}
       
       {success && (
         <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
@@ -142,4 +149,4 @@ export default function VenueForm() {
       </form>
     </div>
   );
-} 
+}  

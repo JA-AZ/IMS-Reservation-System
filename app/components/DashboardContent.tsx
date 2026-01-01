@@ -132,6 +132,27 @@ export default function DashboardContent() {
       { name: 'Cancelled', value: stats.Cancelled, color: 'bg-red-500' }
     ];
   };
+
+  // Check if venue has a reservation today
+  const venueHasReservationToday = (venueId: string): boolean => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    return allReservations.some(res => {
+      if (res.status === 'Cancelled') return false;
+      if (res.venueId !== venueId) return false;
+      return today >= res.startDate && today <= res.endDate;
+    });
+  };
+
+  // Get venue status for today
+  const getVenueStatus = (venue: VenueType) => {
+    const hasReservation = venueHasReservationToday(venue.id);
+    return {
+      hasReservation,
+      status: hasReservation ? 'Has Reservation' : 'Available',
+      statusColor: hasReservation ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800',
+      dotColor: hasReservation ? 'bg-red-500' : 'bg-green-500'
+    };
+  };
   
   const getTotalBookings = () => allReservations.length;
   const getActiveBookings = () => allReservations.filter(res => res.status !== 'Cancelled').length;
@@ -149,91 +170,140 @@ export default function DashboardContent() {
     return acc;
   }, {} as { [key: string]: string });
 
+  const todayLabel = format(new Date(), 'EEEE, MMM d, yyyy');
+  const totalBookings = getTotalBookings();
+  const totalToday = todayEvents.length;
+  const totalUpcoming = upcomingEvents.length;
+  const venuesInUse = new Set(allReservations.map(res => res.venueId)).size;
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-2">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <div className="mt-2 md:mt-0 flex space-x-1">
-          <button 
-            onClick={() => setTimeframe('today')}
-            className={`px-3 py-1 text-sm rounded-md ${
-              timeframe === 'today' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
+      {/* Top banner & actions */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-2">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            High‑level view of reservations, venue usage, and upcoming events.
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            {todayLabel} &middot; {totalBookings} total bookings across {venues.length} venue
+            {venues.length === 1 ? '' : 's'}.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 justify-start md:justify-end">
+          {/* Timeframe toggle */}
+          <div className="inline-flex rounded-md border border-gray-200 bg-white shadow-sm overflow-hidden text-sm">
+            <button
+              type="button"
+              onClick={() => setTimeframe('today')}
+              className={`px-3 py-1.5 whitespace-nowrap ${
+                timeframe === 'today'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={() => setTimeframe('week')}
+              className={`px-3 py-1.5 border-l border-gray-200 whitespace-nowrap ${
+                timeframe === 'week'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              This week
+            </button>
+            <button
+              type="button"
+              onClick={() => setTimeframe('month')}
+              className={`px-3 py-1.5 border-l border-gray-200 whitespace-nowrap ${
+                timeframe === 'month'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              This month
+            </button>
+          </div>
+
+          {/* Quick actions */}
+          <Link
+            href="/new-reservation"
+            className="w-full sm:w-auto inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
           >
-            Today
-          </button>
-          <button 
-            onClick={() => setTimeframe('week')}
-            className={`px-3 py-1 text-sm rounded-md ${
-              timeframe === 'week' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
+            + New reservation
+          </Link>
+          <Link
+            href="/new-item-borrowing"
+            className="w-full sm:w-auto inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
           >
-            This Week
-          </button>
-          <button 
-            onClick={() => setTimeframe('month')}
-            className={`px-3 py-1 text-sm rounded-md ${
-              timeframe === 'month' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            This Month
-          </button>
+            + New item borrowing
+          </Link>
         </div>
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-blue-100 text-blue-600">
-              <FiCalendar size={20} />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Total Bookings</p>
-              <p className="text-2xl font-bold text-gray-900">{getTotalBookings()}</p>
-            </div>
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex items-start justify-between">
+          <div>
+            <p className="text-xs font-medium tracking-wide text-gray-500 uppercase">
+              Total bookings
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-gray-900">{totalBookings}</p>
+            <p className="mt-1 text-xs text-gray-500">
+              {getActiveBookings()} active, {getCancellationRate()}% cancelled
+            </p>
+          </div>
+          <div className="p-3 rounded-full bg-blue-50 text-blue-600 flex-shrink-0">
+            <FiCalendar size={22} />
           </div>
         </div>
-        
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-green-100 text-green-600">
-              <FiActivity size={20} />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Active Bookings</p>
-              <p className="text-2xl font-bold text-gray-900">{getActiveBookings()}</p>
-            </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex items-start justify-between">
+          <div>
+            <p className="text-xs font-medium tracking-wide text-gray-500 uppercase">
+              Today&apos;s events
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-gray-900">{totalToday}</p>
+            <p className="mt-1 text-xs text-gray-500">
+              {totalToday === 0 ? 'No bookings today' : 'Booked for today'}
+            </p>
+          </div>
+          <div className="p-3 rounded-full bg-green-50 text-green-600 flex-shrink-0">
+            <FiActivity size={22} />
           </div>
         </div>
-        
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-yellow-100 text-yellow-600">
-              <FiMapPin size={20} />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Total Venues</p>
-              <p className="text-2xl font-bold text-gray-900">{venues.length}</p>
-            </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex items-start justify-between">
+          <div>
+            <p className="text-xs font-medium tracking-wide text-gray-500 uppercase">
+              Upcoming events
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-gray-900">{totalUpcoming}</p>
+            <p className="mt-1 text-xs text-gray-500">
+              Next 5 are shown below in Upcoming Events.
+            </p>
+          </div>
+          <div className="p-3 rounded-full bg-indigo-50 text-indigo-600 flex-shrink-0">
+            <FiClock size={22} />
           </div>
         </div>
-        
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-red-100 text-red-600">
-              <FiAlertCircle size={20} />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Cancellation Rate</p>
-              <p className="text-2xl font-bold text-gray-900">{getCancellationRate()}%</p>
-            </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex items-start justify-between">
+          <div>
+            <p className="text-xs font-medium tracking-wide text-gray-500 uppercase">
+              Venues in use
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-gray-900">
+              {venuesInUse}/{venues.length || 0}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">Distinct venues with at least one booking.</p>
+          </div>
+          <div className="p-3 rounded-full bg-yellow-50 text-yellow-600 flex-shrink-0">
+            <FiMapPin size={22} />
           </div>
         </div>
       </div>
@@ -305,74 +375,51 @@ export default function DashboardContent() {
           )}
         </div>
 
-        {/* Status Distribution */}
+        {/* Venue Status */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold mb-4 flex items-center text-gray-900">
-            <FiPieChart className="mr-2" /> Reservation Status
+            <FiMapPin className="mr-2" /> Venue Status Today
           </h2>
           
           {loading ? (
             <div className="h-64 flex items-center justify-center">
               <div className="animate-pulse text-gray-500">Loading...</div>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {getStatusCounts().map((status) => (
-                <div key={status.name} className="flex items-center">
-                  <div className="w-full">
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium text-gray-700">{status.name}</span>
-                      <span className="text-sm font-medium text-gray-700">{status.value}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className={`${status.color} h-2 rounded-full`} 
-                        style={{ 
-                          width: `${getTotalBookings() > 0 ? (status.value / getTotalBookings()) * 100 : 0}%` 
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          <h2 className="text-lg font-semibold mt-8 mb-4 flex items-center text-gray-900">
-            <FiBarChart2 className="mr-2" /> Most Used Venues
-          </h2>
-          
-          {loading ? (
-            <div className="h-40 flex items-center justify-center">
-              <div className="animate-pulse text-gray-500">Loading...</div>
+          ) : venues.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No venues available
             </div>
           ) : (
             <div className="space-y-3">
-              {getMostUsedVenues().map((venue) => (
-                <div key={venue.id} className="flex items-center">
-                  <div 
-                    className="w-3 h-3 rounded-full mr-2" 
-                    style={{ backgroundColor: venueColors[venue.id] }}
-                  ></div>
-                  <div className="w-full">
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium text-gray-700 truncate max-w-[150px]">
-                        {venue.name}
+              {venues.map((venue) => {
+                const status = getVenueStatus(venue);
+                return (
+                  <Link
+                    key={venue.id}
+                    href={`/venues/${venue.id}`}
+                    className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center flex-1 min-w-0">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-gray-900 truncate">
+                          {venue.name}
+                        </div>
+                        {venue.capacity && (
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            Cap: {venue.capacity}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center ml-4 flex-shrink-0">
+                      <div className={`w-2 h-2 rounded-full ${status.dotColor} mr-2`}></div>
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${status.statusColor}`}>
+                        {status.status}
                       </span>
-                      <span className="text-sm font-medium text-gray-700">{venue.count}</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="h-2 rounded-full" 
-                        style={{ 
-                          width: `${Math.max(venue.count / Math.max(...getMostUsedVenues().map(v => v.count)) * 100, 5)}%`,
-                          backgroundColor: venueColors[venue.id]
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>

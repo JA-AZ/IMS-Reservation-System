@@ -18,11 +18,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <Sidebar isOpen={sidebarOpen} closeSidebar={() => setSidebarOpen(false)} />
       
       <div 
-        className={`transition-all duration-300 ease-in-out pt-4 md:pt-20 ${
+        className={`transition-all duration-300 ease-in-out pt-4 md:pt-12 pb-8 md:pb-12 ${
           sidebarOpen ? 'md:ml-64' : 'ml-0 md:ml-64'
         }`}
       >
-        <main className="container mx-auto px-4  max-w-7xl">
+        <main className="container mx-auto px-4 sm:px-6 lg:px-10 max-w-7xl">
           {children}
         </main>
       </div>

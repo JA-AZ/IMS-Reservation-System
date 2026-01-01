@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '../components/AdminLayout';
 import { ProtectedRoute } from '../context/AuthContext';
 import { getItems, addItemBorrowing, getItemBorrowingsByDate } from '../firebase/services';
-import { Item, ItemBorrowingStatus } from '../types';
+import { Item, ItemBorrowingStatus, ItemBorrowing } from '../types';
 import Link from 'next/link';
-import { FiArrowLeft, FiSave, FiPackage, FiSearch, FiFilter } from 'react-icons/fi';
+import { FiArrowLeft, FiSave, FiPackage, FiSearch, FiFilter, FiX } from 'react-icons/fi';
+import { addDays, format, isAfter } from 'date-fns';
 
 export default function NewItemBorrowingPage() {
   const router = useRouter();
@@ -21,12 +22,18 @@ export default function NewItemBorrowingPage() {
   const [teacherAdviserName, setTeacherAdviserName] = useState('');
   const [department, setDepartment] = useState('');
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
-  const [date, setDate] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [roomLocation, setRoomLocation] = useState('');
   const [receivedBy, setReceivedBy] = useState('');
   const [status, setStatus] = useState<ItemBorrowingStatus>('Reserved');
+  
+  // Multi-date selection within range
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [existingBorrowings, setExistingBorrowings] = useState<ItemBorrowing[]>([]);
+  const [conflictsByDate, setConflictsByDate] = useState<Record<string, ItemBorrowing[]>>({});
   
   // Availability state
   const [availableItems, setAvailableItems] = useState<Item[]>([]);
@@ -41,11 +48,131 @@ export default function NewItemBorrowingPage() {
     fetchItems();
   }, []);
   
+  // Set end date to match start date by default
   useEffect(() => {
-    if (date && startTime && endTime) {
+    if (startDate && !endDate) {
+      setEndDate(startDate);
+    }
+  }, [startDate, endDate]);
+
+  // Helper to generate all dates in range [startDate, endDate]
+  const allDatesInRange = useMemo(() => {
+    if (!startDate || !endDate || endDate < startDate) return [];
+    const dates: string[] = [];
+    let current = new Date(startDate);
+    const last = new Date(endDate);
+
+    while (!isAfter(current, last)) {
+      dates.push(format(current, 'yyyy-MM-dd'));
+      current = addDays(current, 1);
+    }
+    return dates;
+  }, [startDate, endDate]);
+
+  // Load existing borrowings for conflict checking
+  useEffect(() => {
+    const fetchBorrowings = async () => {
+      if (allDatesInRange.length === 0 || !startTime || !endTime || selectedItemIds.length === 0) {
+        setExistingBorrowings([]);
+        setConflictsByDate({});
+        return;
+      }
+      
+      try {
+        // Fetch borrowings for all dates in range
+        const allBorrowings: ItemBorrowing[] = [];
+        for (const date of allDatesInRange) {
+          const borrowings = await getItemBorrowingsByDate(date);
+          allBorrowings.push(...borrowings);
+        }
+        setExistingBorrowings(allBorrowings);
+      } catch (err) {
+        console.error('Error loading borrowings for conflict check:', err);
+      }
+    };
+
+    fetchBorrowings();
+  }, [allDatesInRange, startTime, endTime, selectedItemIds]);
+
+  // Compute per-day conflicts for the selected items/time within the range
+  useEffect(() => {
+    if (!startTime || !endTime || allDatesInRange.length === 0 || selectedItemIds.length === 0) {
+      setConflictsByDate({});
+      return;
+    }
+
+    const conflicts: Record<string, ItemBorrowing[]> = {};
+
+    for (const date of allDatesInRange) {
+      const conflicting = existingBorrowings.filter(existing => {
+        // Ignore cancelled borrowings
+        if (existing.status === 'Cancelled') return false;
+
+        // Date must match
+        if (existing.date !== date && 
+            (!existing.startDate || existing.startDate > date || 
+             !existing.endDate || existing.endDate < date)) {
+          return false;
+        }
+
+        // Check if any selected item is in the existing borrowing
+        const hasItemConflict = existing.itemIds.some(itemId => selectedItemIds.includes(itemId));
+        if (!hasItemConflict) return false;
+
+        // Time overlap check
+        const existingStartTime = existing.startTime;
+        const existingEndTime = existing.endTime;
+        const newStartTime = startTime;
+        const newEndTime = endTime;
+
+        return !(newEndTime <= existingStartTime || newStartTime >= existingEndTime);
+      });
+
+      if (conflicting.length > 0) {
+        conflicts[date] = conflicting;
+      }
+    }
+
+    setConflictsByDate(conflicts);
+  }, [startTime, endTime, allDatesInRange, existingBorrowings, selectedItemIds]);
+
+  // When the range or conflicts change, keep selections in sync
+  useEffect(() => {
+    if (allDatesInRange.length === 0) {
+      setSelectedDates([]);
+      return;
+    }
+
+    setSelectedDates(prev => {
+      // Start from previous selections that are still in the range,
+      // or all non-Sunday dates if nothing selected yet
+      const base =
+        prev.length > 0
+          ? prev.filter(d => allDatesInRange.includes(d))
+          : allDatesInRange.filter(d => {
+              const day = new Date(d).getDay(); // 0 = Sunday
+              return day !== 0;
+            });
+
+      // Remove any dates that are now conflicting
+      return base.filter(d => !conflictsByDate[d]);
+    });
+  }, [allDatesInRange, conflictsByDate]);
+
+  const toggleSelectedDate = (date: string) => {
+    // Do not allow toggling dates that are already booked for these items/time
+    if (conflictsByDate[date]) return;
+
+    setSelectedDates(prev =>
+      prev.includes(date) ? prev.filter(d => d !== date) : [...prev, date].sort()
+    );
+  };
+
+  useEffect(() => {
+    if (allDatesInRange.length > 0 && startTime && endTime && selectedItemIds.length > 0) {
       checkItemAvailability();
     }
-  }, [date, startTime, endTime]);
+  }, [allDatesInRange, startTime, endTime, selectedItemIds]);
   
   // Filter items based on search term and category
   useEffect(() => {
@@ -82,26 +209,31 @@ export default function NewItemBorrowingPage() {
   };
   
   const checkItemAvailability = async () => {
-    if (!date || !startTime || !endTime) return;
+    if (allDatesInRange.length === 0 || !startTime || !endTime) {
+      setAvailableItems(items);
+      return;
+    }
     
     setCheckingAvailability(true);
     try {
-      // Get existing borrowings for the selected date
-      const existingBorrowings = await getItemBorrowingsByDate(date);
-      
       // Helper function to check time overlap
       const hasTimeOverlap = (existingStart: string, existingEnd: string, newStart: string, newEnd: string) => {
         return newStart < existingEnd && newEnd > existingStart;
       };
       
-      // Filter out items that are already booked during the selected time
+      // Filter out items that are already booked during the selected time on any selected date
       const availableForTime = items.filter(item => {
+        // Check if item is booked on any of the selected dates
         const isBooked = existingBorrowings.some(borrowing => {
           // Skip cancelled borrowings
           if (borrowing.status === 'Cancelled') return false;
           
-          // Check if this item is in the borrowing
+          // Check if this item is in the existing borrowing
           if (!borrowing.itemIds.includes(item.id)) return false;
+          
+          // Check if borrowing date is in selected dates
+          const borrowingDate = borrowing.date || borrowing.startDate;
+          if (!selectedDates.includes(borrowingDate)) return false;
           
           // Check for time overlap
           return hasTimeOverlap(borrowing.startTime, borrowing.endTime, startTime, endTime);
@@ -147,22 +279,68 @@ export default function NewItemBorrowingPage() {
       setLoading(false);
       return;
     }
+
+    if (!startDate || !endDate) {
+      setError('Please select a start and end date.');
+      setLoading(false);
+      return;
+    }
+
+    if (selectedDates.length === 0) {
+      setError('Please keep at least one day selected in the date range.');
+      setLoading(false);
+      return;
+    }
     
     try {
-      const newBorrowing = {
-        borrowerName,
-        teacherAdviserName,
-        department,
-        itemIds: selectedItemIds,
-        date,
-        startTime,
-        endTime,
-        roomLocation,
-        receivedBy,
-        status
-      };
-      
-      await addItemBorrowing(newBorrowing);
+      // Sort selected dates and group into contiguous ranges
+      const sortedDates = [...selectedDates].sort();
+
+      type DateRange = { start: string; end: string };
+      const ranges: DateRange[] = [];
+
+      let rangeStart = sortedDates[0];
+      let previous = sortedDates[0];
+
+      for (let i = 1; i < sortedDates.length; i++) {
+        const current = sortedDates[i];
+        const prevDate = new Date(previous);
+        const nextExpected = format(addDays(prevDate, 1), 'yyyy-MM-dd');
+
+        if (current === nextExpected) {
+          // still contiguous
+          previous = current;
+        } else {
+          // close previous range
+          ranges.push({ start: rangeStart, end: previous });
+          rangeStart = current;
+          previous = current;
+        }
+      }
+      // push final range
+      ranges.push({ start: rangeStart, end: previous });
+
+      // Create one borrowing per contiguous range
+      for (const range of ranges) {
+        const newBorrowing = {
+          borrowerName,
+          teacherAdviserName,
+          department,
+          itemIds: selectedItemIds,
+          date: range.start, // Keep for backward compatibility
+          startDate: range.start,
+          endDate: range.end,
+          selectedDates: sortedDates.filter(d => d >= range.start && d <= range.end),
+          startTime,
+          endTime,
+          roomLocation,
+          receivedBy,
+          status
+        };
+
+        await addItemBorrowing(newBorrowing);
+      }
+
       setSuccess(true);
       
       // Reset form or redirect
@@ -171,7 +349,7 @@ export default function NewItemBorrowingPage() {
       }, 2000);
       
     } catch (error: any) {
-      setError(error.message || 'Failed to create borrowing request');
+      setError(error.message || 'Failed to create borrowing request(s). Some dates may have been created; please review the borrowings list.');
     } finally {
       setLoading(false);
     }
@@ -195,7 +373,7 @@ export default function NewItemBorrowingPage() {
   return (
     <ProtectedRoute>
       <AdminLayout>
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <div className="mb-6">
             <Link
               href="/item-borrowings"
@@ -206,7 +384,7 @@ export default function NewItemBorrowingPage() {
             </Link>
           </div>
           
-          <div className="bg-white shadow rounded-lg p-6">
+          <div className="bg-white shadow rounded-lg p-6 lg:p-8">
             <div className="mb-6">
               <h1 className="text-2xl font-bold text-gray-900">New Item Borrowing Request</h1>
               <p className="text-gray-600 mt-2">Create a new borrowing request for items</p>
@@ -228,7 +406,7 @@ export default function NewItemBorrowingPage() {
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6">
                 {error && (
-                  <div className="bg-red-50 border-l-4 border-red-500 p-4">
+                  <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
                     <div className="flex">
                       <div className="flex-shrink-0">
                         <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -242,7 +420,11 @@ export default function NewItemBorrowingPage() {
                   </div>
                 )}
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Two-column layout: left = details, right = items */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  {/* Left column: borrower & schedule details */}
+                  <div className="lg:col-span-2 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Borrower's Name */}
                   <div>
                     <label htmlFor="borrowerName" className="block text-sm font-medium text-gray-700">
@@ -291,21 +473,98 @@ export default function NewItemBorrowingPage() {
                     />
                   </div>
                   
-                  {/* Date */}
+                  {/* Room/Location */}
                   <div>
-                    <label htmlFor="date" className="block text-sm font-medium text-gray-700">
-                      Date *
+                    <label htmlFor="roomLocation" className="block text-sm font-medium text-gray-700">
+                      Room/Location *
+                    </label>
+                    <input
+                      type="text"
+                      id="roomLocation"
+                      value={roomLocation}
+                      onChange={(e) => setRoomLocation(e.target.value)}
+                      required
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Enter room or location"
+                    />
+                  </div>
+                  
+                  {/* Start Date */}
+                  <div>
+                    <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
+                      Start Date *
                     </label>
                     <input
                       type="date"
-                      id="date"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
+                      id="startDate"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
                       required
                       min={new Date().toISOString().split('T')[0]}
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
+                  
+                  {/* End Date */}
+                  <div>
+                    <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
+                      End Date *
+                    </label>
+                    <input
+                      type="date"
+                      id="endDate"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      required
+                      min={startDate || new Date().toISOString().split('T')[0]}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  
+                  {/* Date selections within range */}
+                  {startDate && endDate && endDate >= startDate && allDatesInRange.length > 1 && (
+                    <div className="md:col-span-2 border border-gray-200 rounded-md bg-gray-50 p-3 mt-2">
+                      <p className="text-xs text-gray-600 mb-2">
+                        By default, every non-Sunday between the start and end dates is included.
+                        Uncheck any days you want to skip. Separate borrowings will be created
+                        for each continuous block of selected days.
+                      </p>
+                      <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-1">
+                        {allDatesInRange.map(date => {
+                          const d = new Date(date);
+                          const label = format(d, 'EEE, MMM d');
+                          const checked = selectedDates.includes(date);
+                          const conflicts = conflictsByDate[date];
+                          const hasConflict = conflicts && conflicts.length > 0;
+
+                          return (
+                            <label
+                              key={date}
+                              className={`inline-flex items-center px-2 py-1 rounded-full border text-xs ${
+                                hasConflict
+                                  ? 'bg-red-100 border-red-300 text-red-700 cursor-not-allowed'
+                                  : checked
+                                  ? 'bg-blue-600 border-blue-600 text-white cursor-pointer'
+                                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-100 cursor-pointer'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="sr-only"
+                                checked={checked}
+                                onChange={() => toggleSelectedDate(date)}
+                                disabled={hasConflict}
+                              />
+                              <span>{label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500">
+                        {selectedDates.length} day{selectedDates.length === 1 ? '' : 's'} selected.
+                      </p>
+                    </div>
+                  )}
                   
                   {/* Start Time */}
                   <div>
@@ -338,22 +597,6 @@ export default function NewItemBorrowingPage() {
                       min="07:00"
                       max="22:00"
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  
-                  {/* Room/Location */}
-                  <div>
-                    <label htmlFor="roomLocation" className="block text-sm font-medium text-gray-700">
-                      Room/Location *
-                    </label>
-                    <input
-                      type="text"
-                      id="roomLocation"
-                      value={roomLocation}
-                      onChange={(e) => setRoomLocation(e.target.value)}
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Enter room or location"
                     />
                   </div>
                   
@@ -391,133 +634,191 @@ export default function NewItemBorrowingPage() {
                     </select>
                   </div>
                 </div>
-                
-                {/* Items Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Select Items to Borrow *
-                  </label>
-                  
-                  {checkingAvailability ? (
-                    <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                      <p className="mt-2 text-sm text-gray-600">Checking item availability...</p>
-                    </div>
-                  ) : availableItems.length === 0 ? (
-                    <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-                      <FiPackage className="mx-auto h-12 w-12 text-gray-400" />
-                      <h3 className="mt-2 text-sm font-medium text-gray-900">No available items</h3>
-                      <p className="mt-1 text-sm text-gray-500">
-                        {date && startTime && endTime 
-                          ? 'No items are available for the selected date and time. Please try a different time slot.'
-                          : 'All items are currently unavailable for borrowing.'
-                        }
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      {/* Search and Filter Controls */}
-                      <div className="mb-4 space-y-3">
-                        <div className="flex flex-col sm:flex-row gap-3">
-                          {/* Search Input */}
-                          <div className="flex-1 relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                              <FiSearch className="h-5 w-5 text-gray-400" />
-                            </div>
-                            <input
-                              type="text"
-                              placeholder="Search items by name, description, or serial number..."
-                              value={searchTerm}
-                              onChange={(e) => setSearchTerm(e.target.value)}
-                              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                          </div>
-                          
-                          {/* Category Filter */}
-                          <div className="sm:w-48">
-                            <select
-                              value={selectedCategory}
-                              onChange={(e) => setSelectedCategory(e.target.value)}
-                              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                            >
-                              <option value="">All Categories</option>
-                              {getUniqueCategories().map((category) => (
-                                <option key={category} value={category}>
-                                  {category}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          
-                          {/* Clear Filters Button */}
-                          {(searchTerm || selectedCategory) && (
-                            <button
-                              type="button"
-                              onClick={clearFilters}
-                              className="px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            >
-                              Clear Filters
-                            </button>
-                          )}
-                        </div>
-                        
-                        {/* Results Summary */}
-                        <div className="flex items-center justify-between text-sm text-gray-600">
-                          <span>
-                            Showing {filteredItems.length} of {availableItems.length} available items
-                          </span>
-                          {(searchTerm || selectedCategory) && (
-                            <span className="text-blue-600">
-                              Filtered results
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                    
+                    {/* Items Selection */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Select Items to Borrow *
+                      </label>
                       
-                      {/* Items Grid */}
-                      {filteredItems.length === 0 ? (
+                      {checkingAvailability ? (
                         <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-                          <FiPackage className="mx-auto h-8 w-8 text-gray-400" />
-                          <h3 className="mt-2 text-sm font-medium text-gray-900">No items found</h3>
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                          <p className="mt-2 text-sm text-gray-600">Checking item availability...</p>
+                        </div>
+                      ) : availableItems.length === 0 ? (
+                        <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                          <FiPackage className="mx-auto h-12 w-12 text-gray-400" />
+                          <h3 className="mt-2 text-sm font-medium text-gray-900">No available items</h3>
                           <p className="mt-1 text-sm text-gray-500">
-                            {searchTerm || selectedCategory 
-                              ? 'Try adjusting your search terms or category filter.'
-                              : 'No items are currently available.'
-                            }
+                            {selectedDates.length > 0 && startTime && endTime 
+                              ? 'No items are available for the selected date range and time. Please try a different time slot or adjust the dates.'
+                              : 'All items are currently unavailable for borrowing.'}
                           </p>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-64 overflow-y-auto border border-gray-300 rounded-lg p-4">
-                          {filteredItems.map((item) => (
-                            <label key={item.id} className="flex items-start space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                              <input
-                                type="checkbox"
-                                checked={selectedItemIds.includes(item.id)}
-                                onChange={(e) => handleItemSelection(item.id, e.target.checked)}
-                                className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900">{item.name}</p>
-                                <p className="text-sm text-gray-500">{item.description}</p>
-                                <p className="text-xs text-gray-400">SN: {item.serialNumber}</p>
-                                {item.category && (
-                                  <p className="text-xs text-gray-400">Category: {item.category}</p>
-                                )}
+                        <>
+                          {/* Search and Filter Controls */}
+                          <div className="mb-4 space-y-3">
+                            <div className="flex flex-col sm:flex-row gap-3">
+                              {/* Search Input */}
+                              <div className="flex-1 relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                  <FiSearch className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <input
+                                  type="text"
+                                  placeholder="Search items by name, description, or serial number..."
+                                  value={searchTerm}
+                                  onChange={(e) => setSearchTerm(e.target.value)}
+                                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                />
                               </div>
-                            </label>
-                          ))}
-                        </div>
+                              
+                              {/* Category Filter */}
+                              <div className="sm:w-48">
+                                <select
+                                  value={selectedCategory}
+                                  onChange={(e) => setSelectedCategory(e.target.value)}
+                                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                  <option value="">All Categories</option>
+                                  {getUniqueCategories().map((category) => (
+                                    <option key={category} value={category}>
+                                      {category}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              
+                              {/* Clear Filters Button */}
+                              {(searchTerm || selectedCategory) && (
+                                <button
+                                  type="button"
+                                  onClick={clearFilters}
+                                  className="px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                >
+                                  Clear Filters
+                                </button>
+                              )}
+                            </div>
+                            
+                            {/* Results Summary */}
+                            <div className="flex items-center justify-between text-sm text-gray-600">
+                              <span>
+                                Showing {filteredItems.length} of {availableItems.length} available items
+                              </span>
+                              {(searchTerm || selectedCategory) && (
+                                <span className="text-blue-600">
+                                  Filtered results
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Items Grid */}
+                          {filteredItems.length === 0 ? (
+                            <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                              <FiPackage className="mx-auto h-8 w-8 text-gray-400" />
+                              <h3 className="mt-2 text-sm font-medium text-gray-900">No items found</h3>
+                              <p className="mt-1 text-sm text-gray-500">
+                                {searchTerm || selectedCategory 
+                                  ? 'Try adjusting your search terms or category filter.'
+                                  : 'No items are currently available.'
+                                }
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-64 overflow-y-auto border border-gray-300 rounded-lg p-4">
+                              {filteredItems.map((item) => (
+                                <label key={item.id} className="flex items-start space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedItemIds.includes(item.id)}
+                                    onChange={(e) => handleItemSelection(item.id, e.target.checked)}
+                                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                                    <p className="text-sm text-gray-500">{item.description}</p>
+                                    <p className="text-xs text-gray-400">SN: {item.serialNumber}</p>
+                                    {item.category && (
+                                      <p className="text-xs text-gray-400">Category: {item.category}</p>
+                                    )}
+                                  </div>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </>
                       )}
-                    </>
-                  )}
-                  
-                  {selectedItemIds.length > 0 && (
-                    <p className="mt-2 text-sm text-gray-600">
-                      Selected {selectedItemIds.length} item(s)
-                    </p>
-                  )}
+                    </div>
+                  </div>
+
+                  {/* Right column: selected items list only */}
+                  <div className="lg:col-span-1">
+                    {/* Selected Items Section */}
+                    {selectedItemIds.length > 0 ? (
+                      <div className="sticky top-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-medium text-gray-900">
+                            Selected Items ({selectedItemIds.length})
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedItemIds([])}
+                            className="text-sm text-red-600 hover:text-red-700"
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                        <div className="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto">
+                          {selectedItemIds.map((itemId) => {
+                            const item = availableItems.find(i => i.id === itemId) || items.find(i => i.id === itemId);
+                            if (!item) return null;
+                            
+                            return (
+                              <div
+                                key={itemId}
+                                className="flex items-center justify-between py-2 px-3 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-3">
+                                    <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                                    <span className="text-xs text-gray-500">SN: {item.serialNumber}</span>
+                                    {item.category && (
+                                      <span className="text-xs text-gray-500">• {item.category}</span>
+                                    )}
+                                  </div>
+                                  {item.description && (
+                                    <p className="text-sm text-gray-600 mt-1 line-clamp-1">{item.description}</p>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleItemSelection(itemId, false)}
+                                  className="ml-4 text-gray-400 hover:text-red-600 transition-colors flex-shrink-0"
+                                  title="Remove item"
+                                >
+                                  <FiX size={18} />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                        <FiPackage className="mx-auto h-12 w-12 text-gray-400" />
+                        <h3 className="mt-2 text-sm font-medium text-gray-900">No items selected</h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          Select items from the list to add them here
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                
+
                 {/* Submit Button */}
                 <div className="flex justify-end space-x-3">
                   <Link

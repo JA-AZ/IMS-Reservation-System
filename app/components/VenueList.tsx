@@ -144,7 +144,7 @@ export default function VenueList() {
               )}
               
               {venue.description && (
-                <p className="text-gray-700 mb-4 leading-relaxed">{venue.description}</p>
+                <p className="text-gray-700 mb-4 leading-relaxed whitespace-pre-wrap">{venue.description}</p>
               )}
               
               <Link

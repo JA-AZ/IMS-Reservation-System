@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import AdminLayout from '../../../components/AdminLayout';
 import { ProtectedRoute } from '../../../context/AuthContext';
-import { getItemById, updateItem } from '../../../firebase/services';
+import { getItemById, updateItem, getItems } from '../../../firebase/services';
 import { Item, ItemStatus } from '../../../types';
 import Link from 'next/link';
 import { FiArrowLeft, FiSave } from 'react-icons/fi';
@@ -26,12 +26,33 @@ export default function EditItemPage() {
   const [serialNumber, setSerialNumber] = useState('');
   const [status, setStatus] = useState<ItemStatus>('Available');
   const [category, setCategory] = useState('');
+  const [categories, setCategories] = useState<string[]>([]);
   
   useEffect(() => {
     if (itemId) {
       fetchItem();
     }
   }, [itemId]);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const existingItems = await getItems();
+        const uniqueCategories = Array.from(
+          new Set(
+            existingItems
+              .map((item: any) => (item.category ?? '').trim())
+              .filter((value: string) => value.length > 0)
+          )
+        ).sort((a, b) => a.localeCompare(b));
+        setCategories(uniqueCategories);
+      } catch (err) {
+        console.error('Error loading item categories', err);
+      }
+    };
+
+    loadCategories();
+  }, []);
   
   const fetchItem = async () => {
     try {
@@ -262,9 +283,20 @@ export default function EditItemPage() {
                       id="category"
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
+                      list="item-category-options"
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Enter category (optional)"
+                      placeholder="Select or enter category (optional)"
                     />
+                    {categories.length > 0 && (
+                      <datalist id="item-category-options">
+                        {categories.map((cat) => (
+                          <option key={cat} value={cat} />
+                        ))}
+                      </datalist>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      Start typing to choose from existing categories or add a new one.
+                    </p>
                   </div>
                 </div>
                 

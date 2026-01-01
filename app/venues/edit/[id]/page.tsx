@@ -179,4 +179,4 @@ export default function EditVenuePage() {
       </div>
     </AdminLayout>
   );
-} 
+}  

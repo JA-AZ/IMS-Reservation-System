@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { format, addMonths, subMonths } from 'date-fns';
 import { FiCalendar, FiMapPin, FiClock, FiUser, FiMail, FiEdit, FiArrowLeft, FiPlus, FiChevronLeft, FiChevronRight, FiFilter } from 'react-icons/fi';
 import { getVenueById, getReservationsByVenue } from '../firebase/services';
 import { VenueType, Reservation } from '../types';
@@ -27,13 +27,32 @@ export default function VenueDetails({ venueId }: VenueDetailsProps) {
   });
   
   // Filtering state
-  const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [dateRangeStart, setDateRangeStart] = useState<string>('');
+  const [dateRangeEnd, setDateRangeEnd] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>('');
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const rowsPerPage = 10;
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+
+  // Helper function to get timestamp value for sorting by createdAt
+  const getTimestamp = (createdAt: any): number => {
+    if (!createdAt) return 0;
+    if (createdAt.toDate) {
+      return createdAt.toDate().getTime();
+    }
+    if (createdAt instanceof Date) {
+      return createdAt.getTime();
+    }
+    if (typeof createdAt === 'string') {
+      return new Date(createdAt).getTime();
+    }
+    return 0;
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -45,11 +64,18 @@ export default function VenueDetails({ venueId }: VenueDetailsProps) {
         }
         
         const reservationsData = await getReservationsByVenue(venueId);
+
+        // Sort reservations by createdAt descending (most recent first)
+        const sortedReservations = [...reservationsData].sort((a, b) => {
+          const timeA = getTimestamp(a.createdAt);
+          const timeB = getTimestamp(b.createdAt);
+          return timeB - timeA;
+        });
         
         setVenue(venueData);
-        setReservations(reservationsData);
-        setFilteredReservations(reservationsData);
-        setTotalPages(Math.ceil(reservationsData.length / rowsPerPage));
+        setReservations(sortedReservations);
+        setFilteredReservations(sortedReservations);
+        setTotalPages(Math.ceil(sortedReservations.length / rowsPerPage));
       } catch (error) {
         console.error('Error fetching data:', error);
         setError('Failed to load venue details');
@@ -61,27 +87,50 @@ export default function VenueDetails({ venueId }: VenueDetailsProps) {
     fetchData();
   }, [venueId]);
   
-  // Apply filters when they change
+  // Debounce search term for smoother filtering
   useEffect(() => {
-    // Apply filters
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  // Apply filters when inputs change
+  useEffect(() => {
     let filtered = [...reservations];
-    
-    // Filter by month
-    if (selectedMonth) {
-      const [year, month] = selectedMonth.split('-');
-      const startDate = startOfMonth(new Date(parseInt(year), parseInt(month) - 1));
-      const endDate = endOfMonth(new Date(parseInt(year), parseInt(month) - 1));
-      
+
+    // Filter by date range (overlap logic)
+    if (dateRangeStart || dateRangeEnd) {
       filtered = filtered.filter(res => {
         const resStartDate = new Date(res.startDate);
         const resEndDate = new Date(res.endDate);
-        
-        // Check if any part of the reservation falls within the selected month
-        return (
-          (resStartDate >= startDate && resStartDate <= endDate) || 
-          (resEndDate >= startDate && resEndDate <= endDate) ||
-          (resStartDate <= startDate && resEndDate >= endDate)
-        );
+
+        const hasStart = Boolean(dateRangeStart);
+        const hasEnd = Boolean(dateRangeEnd);
+
+        if (!hasStart && !hasEnd) return true;
+
+        if (hasStart && !hasEnd) {
+          const filterStart = new Date(dateRangeStart);
+          filterStart.setHours(0, 0, 0, 0);
+          return resEndDate >= filterStart;
+        }
+
+        if (!hasStart && hasEnd) {
+          const filterEnd = new Date(dateRangeEnd);
+          filterEnd.setHours(23, 59, 59, 999);
+          return resStartDate <= filterEnd;
+        }
+
+        const filterStart = new Date(dateRangeStart);
+        filterStart.setHours(0, 0, 0, 0);
+        const filterEnd = new Date(dateRangeEnd);
+        filterEnd.setHours(23, 59, 59, 999);
+
+        const matchesStart = resEndDate >= filterStart;
+        const matchesEnd = resStartDate <= filterEnd;
+
+        return matchesStart && matchesEnd;
       });
     }
     
@@ -89,11 +138,26 @@ export default function VenueDetails({ venueId }: VenueDetailsProps) {
     if (selectedStatus) {
       filtered = filtered.filter(res => res.status === selectedStatus);
     }
+
+    // Filter by event title (case-insensitive)
+    if (debouncedSearchTerm.trim() !== '') {
+      const term = debouncedSearchTerm.trim().toLowerCase();
+      filtered = filtered.filter(res =>
+        res.eventTitle.toLowerCase().includes(term)
+      );
+    }
+
+    // Sort by createdAt descending (most recent first)
+    filtered.sort((a, b) => {
+      const timeA = getTimestamp(a.createdAt);
+      const timeB = getTimestamp(b.createdAt);
+      return timeB - timeA;
+    });
     
     setFilteredReservations(filtered);
     setTotalPages(Math.ceil(filtered.length / rowsPerPage));
     setCurrentPage(1); // Reset to first page when filters change
-  }, [selectedMonth, selectedStatus, reservations]);
+  }, [dateRangeStart, dateRangeEnd, selectedStatus, reservations, debouncedSearchTerm]);
 
   const handleDateClick = (dateStr: string) => {
     const reservationsOnDate = reservations.filter(res => 
@@ -180,23 +244,29 @@ export default function VenueDetails({ venueId }: VenueDetailsProps) {
     const endIndex = startIndex + rowsPerPage;
     return filteredReservations.slice(startIndex, endIndex);
   };
-  
-  // Get available months from reservations
-  const getAvailableMonths = () => {
-    const months = new Set<string>();
+
+  // Get min and max dates from reservations for date picker limits
+  const getDateRange = () => {
+    if (reservations.length === 0) {
+      return { min: '', max: '' };
+    }
     
-    reservations.forEach(res => {
-      // Add start date month
-      const startDate = new Date(res.startDate);
-      months.add(`${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`);
-      
-      // Add end date month if different
-      const endDate = new Date(res.endDate);
-      months.add(`${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}`);
-    });
+    const dates = reservations.flatMap(res => [
+      new Date(res.startDate),
+      new Date(res.endDate)
+    ]);
     
-    return Array.from(months).sort();
+    const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+    
+    return {
+      min: format(minDate, 'yyyy-MM-dd'),
+      max: format(maxDate, 'yyyy-MM-dd')
+    };
   };
+
+  const dateRange = getDateRange();
+  const hasActiveDateRange = Boolean(dateRangeStart || dateRangeEnd);
   
   const handlePrevPage = () => {
     if (currentPage > 1) {
@@ -278,7 +348,7 @@ export default function VenueDetails({ venueId }: VenueDetailsProps) {
         )}
         
         {venue.description && (
-          <p className="text-gray-700 mb-4">{venue.description}</p>
+          <p className="text-gray-700 mb-4 whitespace-pre-wrap">{venue.description}</p>
         )}
         
         <div className="mt-6 grid grid-cols-2 gap-4">
@@ -320,7 +390,7 @@ export default function VenueDetails({ venueId }: VenueDetailsProps) {
           </div>
         </div>
         
-        <div className="mb-8">
+        <div className="mb-2">
           <div className="grid grid-cols-7 gap-1 text-center font-medium mb-2">
             <div className="text-gray-900">Sun</div>
             <div className="text-gray-900">Mon</div>
@@ -360,56 +430,162 @@ export default function VenueDetails({ venueId }: VenueDetailsProps) {
             })}
           </div>
         </div>
-        
-        <h2 className="text-xl font-semibold mb-4 text-gray-900">Reservations</h2>
-        
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-3">
+          <h2 className="text-xl font-semibold text-gray-900">Reservations</h2>
+        </div>
+
         {reservations.length > 0 ? (
           <>
-            {/* Filters */}
-            <div className="mb-4 border-b border-gray-200 pb-4">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    <FiFilter className="inline mr-1" /> Filter by Month
-                  </label>
-                  <select
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-                  >
-                    <option value="">All Months</option>
-                    {getAvailableMonths().map(month => {
-                      const [year, monthNum] = month.split('-');
-                      const monthName = format(new Date(parseInt(year), parseInt(monthNum) - 1), 'MMMM yyyy');
-                      return (
-                        <option key={month} value={month}>
-                          {monthName}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-                
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    <FiFilter className="inline mr-1" /> Filter by Status
-                  </label>
-                  <select
-                    value={selectedStatus}
-                    onChange={(e) => setSelectedStatus(e.target.value)}
-                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-                  >
-                    <option value="">All Statuses</option>
-                    <option value="Processing">Processing</option>
-                    <option value="Reserved">Reserved</option>
-                    <option value="Confirmed">Confirmed</option>
-                    <option value="Cancelled">Cancelled</option>
-                  </select>
-                </div>
-              </div>
+            {/* Search Bar - Always Visible */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Search by Event Title
+              </label>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Enter event title..."
+                className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm"
+              />
             </div>
 
-            <div className="overflow-x-auto">
+            {/* Filters - Collapsible */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden mb-4">
+              <button
+                type="button"
+                onClick={() => setFiltersExpanded(!filtersExpanded)}
+                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center space-x-2">
+                  <FiFilter className="text-gray-400" size={18} />
+                  <h3 className="text-lg font-medium text-gray-900">Filters</h3>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {(selectedStatus || dateRangeStart || dateRangeEnd) && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedStatus('');
+                        setDateRangeStart('');
+                        setDateRangeEnd('');
+                      }}
+                      className="text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      Clear all filters
+                    </button>
+                  )}
+                  <svg
+                    className={`w-5 h-5 text-gray-400 transition-transform ${filtersExpanded ? 'transform rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </button>
+              
+              {filtersExpanded && (
+                <div className="px-4 pb-4 space-y-4">
+                  <div className="flex flex-col gap-4">
+                    {/* Date range filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <FiCalendar className="inline mr-2" size={16} /> Filter by Date Range
+                      </label>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const today = format(new Date(), 'yyyy-MM-dd');
+                            setDateRangeStart(today);
+                            setDateRangeEnd(today);
+                          }}
+                          className="px-3 py-2 text-sm rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-nowrap"
+                        >
+                          Today
+                        </button>
+                        <div className="flex-1">
+                          <input
+                            type="date"
+                            value={dateRangeStart}
+                            onChange={(e) => setDateRangeStart(e.target.value)}
+                            min={dateRange.min}
+                            max={dateRangeEnd || dateRange.max}
+                            className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm"
+                            placeholder="Start date"
+                          />
+                        </div>
+                        <div className="flex items-center justify-center text-gray-500 text-sm py-2 sm:py-0">
+                          to
+                        </div>
+                        <div className="flex-1">
+                          <input
+                            type="date"
+                            value={dateRangeEnd}
+                            onChange={(e) => setDateRangeEnd(e.target.value)}
+                            min={dateRangeStart || dateRange.min}
+                            max={dateRange.max}
+                            className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm"
+                            placeholder="End date"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDateRangeStart('');
+                            setDateRangeEnd('');
+                          }}
+                          disabled={!hasActiveDateRange}
+                          className={`px-3 py-2 text-sm rounded-md border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                            hasActiveDateRange
+                              ? 'text-gray-600 hover:text-gray-800 border-gray-300 hover:bg-gray-50 bg-white'
+                              : 'text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed'
+                          }`}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      {(dateRangeStart || dateRangeEnd) && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          {dateRangeStart && dateRangeEnd
+                            ? `Showing reservations from ${format(new Date(dateRangeStart), 'MMM d, yyyy')} to ${format(new Date(dateRangeEnd), 'MMM d, yyyy')}`
+                            : dateRangeStart
+                            ? `Showing reservations from ${format(new Date(dateRangeStart), 'MMM d, yyyy')} onwards`
+                            : `Showing reservations up to ${format(new Date(dateRangeEnd), 'MMM d, yyyy')}`}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Status filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <FiFilter className="inline mr-1" size={16} /> Filter by Status
+                      </label>
+                      <select
+                        value={selectedStatus}
+                        onChange={(e) => setSelectedStatus(e.target.value)}
+                        className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                      >
+                        <option value="">All Statuses</option>
+                        <option value="Processing">Processing</option>
+                        <option value="Reserved">Reserved</option>
+                        <option value="Confirmed">Confirmed</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -481,6 +657,47 @@ export default function VenueDetails({ venueId }: VenueDetailsProps) {
                 </tbody>
               </table>
             </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden divide-y divide-gray-200">
+              {getCurrentPageReservations().map((reservation) => (
+                <div
+                  key={reservation.id}
+                  onClick={() => {
+                    setSelectedReservation(reservation);
+                    setShowModal(true);
+                  }}
+                  className="p-4 hover:bg-gray-50 cursor-pointer active:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-900 mb-1">
+                        {reservation.eventTitle}
+                      </div>
+                      <div className="text-xs text-gray-500 mb-1">
+                        {reservation.department}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {reservation.startDate === reservation.endDate
+                          ? formatDate(reservation.startDate)
+                          : `${formatDate(reservation.startDate)} - ${formatDate(reservation.endDate)}`}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedReservation(reservation);
+                        setShowModal(true);
+                      }}
+                      className="ml-4 text-blue-600 hover:text-blue-900 p-2 rounded hover:bg-blue-50 flex-shrink-0"
+                      title="View Details"
+                    >
+                      <FiEdit size={18} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
             
             {/* Pagination */}
             {filteredReservations.length > rowsPerPage && (
@@ -517,7 +734,7 @@ export default function VenueDetails({ venueId }: VenueDetailsProps) {
       
       {/* Modal for reservation details */}
       {showModal && (selectedDate || selectedReservation) && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => { setShowModal(false); setSelectedDate(null); setSelectedReservation(null); }}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => { setShowModal(false); setSelectedDate(null); setSelectedReservation(null); }}>
           <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-6">
               <h3 className="text-xl font-bold mb-4 text-gray-900">

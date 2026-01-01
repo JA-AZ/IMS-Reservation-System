@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { FiHome, FiCalendar, FiPlusSquare, FiSettings, FiMapPin, FiChevronDown, FiChevronRight, FiPackage, FiClipboard, FiClock } from 'react-icons/fi';
-import { getVenues } from '../firebase/services';
+import { FiHome, FiCalendar, FiPlusSquare, FiSettings, FiMapPin, FiChevronDown, FiChevronRight, FiPackage, FiClipboard, FiClock, FiLogOut } from 'react-icons/fi';
+import { getVenues, signOut } from '../firebase/services';
 import { VenueType } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -14,8 +15,20 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, closeSidebar }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user } = useAuth();
   const [venues, setVenues] = useState<VenueType[]>([]);
   const [venuesExpanded, setVenuesExpanded] = useState(false);
+  
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      closeSidebar();
+      router.push('/login');
+    } catch (error) {
+      console.error('Failed to log out', error);
+    }
+  };
   
   useEffect(() => {
     // Only fetch venues if we're on the venues page or a venue detail page
@@ -56,13 +69,13 @@ export default function Sidebar({ isOpen, closeSidebar }: SidebarProps) {
   ];
   
   return (
-    <aside className={`sidebar w-64 bg-gray-800 min-h-screen p-4 text-white fixed top-16 left-0 z-40 transform transition-transform duration-300 md:translate-x-0 ${
+    <aside className={`sidebar w-64 bg-gray-800 h-[calc(100vh-4rem)] p-4 text-white fixed top-16 left-0 z-40 transform transition-transform duration-300 md:translate-x-0 flex flex-col ${
       isOpen ? 'translate-x-0' : '-translate-x-full'
     }`}>
       <div className="flex items-center justify-center h-16 border-b border-gray-700 mb-6">
         <h2 className="text-xl font-bold">Venue Reservation</h2>
       </div>
-      <nav className="flex-1">
+      <nav className="flex-1 overflow-y-auto">
         <ul className="space-y-2">
           {navItems.map((item) => (
             <li key={item.path}>
@@ -114,6 +127,20 @@ export default function Sidebar({ isOpen, closeSidebar }: SidebarProps) {
           ))}
         </ul>
       </nav>
+      
+      {/* Logout Button - Mobile Only */}
+      {user && (
+        <div className="mt-auto pt-4 border-t border-gray-700 md:hidden">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center p-3 rounded-lg transition-colors font-medium text-white hover:bg-red-600 focus:bg-red-600 focus:outline-none"
+            aria-label="Log out"
+          >
+            <FiLogOut size={20} className="mr-3" />
+            <span>Logout</span>
+          </button>
+        </div>
+      )}
     </aside>
   );
 } 
